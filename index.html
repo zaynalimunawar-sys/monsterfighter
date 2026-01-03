@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Glass Sword Swarm</title>
+  <title>Dino Dash</title>
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
   <style>
     :root {
@@ -15,7 +15,7 @@
     body {
       margin: 0;
       padding: 0;
-      background: radial-gradient(circle at top, #1e293b, #020617);
+      background: linear-gradient(135deg, #ff9a56, #ff6b6b);
       font-family: -apple-system, system-ui, sans-serif;
       overflow: hidden;
     }
@@ -26,87 +26,60 @@
       touch-action: none;
     }
 
-    /* Glassmorphic overlay container pinned to screen edges (safe area aware) [web:177][web:180] */
     .hud-layer {
       position: fixed;
       inset: var(--safe-area-top) var(--safe-area-right) var(--safe-area-bottom) var(--safe-area-left);
       pointer-events: none;
     }
 
-    /* Glass panel for joystick and buttons [web:176][web:179][web:185] */
     .glass-panel {
       position: absolute;
-      background: rgba(15, 23, 42, 0.35);
-      border-radius: 22px;
-      border: 1px solid rgba(255, 255, 255, 0.22);
-      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.6);
-      backdrop-filter: blur(22px) saturate(140%);
-      -webkit-backdrop-filter: blur(22px) saturate(140%);
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       pointer-events: auto;
     }
 
-    /* Bottom-left panel for joystick */
-    .panel-left {
+    .panel-top {
+      top: 14px;
       left: 14px;
-      bottom: 14px;
-      width: 150px;
-      height: 150px;
-    }
-
-    /* Bottom-right panel for attack */
-    .panel-right {
       right: 14px;
-      bottom: 14px;
-      width: 130px;
-      height: 130px;
+      height: 80px;
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      justify-content: center;
+      padding: 0 20px;
     }
 
-    /* Glass button inside panel */
-    .glass-button {
-      width: 90px;
-      height: 90px;
+    .score-panel {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      padding: 12px 20px;
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 0.05em;
+    }
+
+    .lives-panel {
+      display: flex;
+      gap: 8px;
+    }
+
+    .heart {
+      width: 32px;
+      height: 32px;
+      background: #ff4757;
       border-radius: 50%;
-      border: 1px solid rgba(255, 255, 255, 0.35);
-      background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.1));
-      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.7);
-      backdrop-filter: blur(26px);
-      -webkit-backdrop-filter: blur(26px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: rgba(15, 23, 42, 0.9);
-      font-weight: 600;
-      font-size: 14px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      user-select: none;
-      -webkit-user-select: none;
-      touch-action: none;
+      box-shadow: 0 4px 12px rgba(255, 71, 87, 0.4);
     }
 
-    .glass-button:active {
-      transform: translateY(2px) scale(0.97);
-      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.7);
-    }
-
-    /* Joystick canvas placed inside glass panel */
-    #joy-layer {
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 150px;
-      height: 150px;
-      pointer-events: none; /* actual touch handled by Phaser underneath */
-    }
-
-    /* On desktop, shrink panels a bit */
     @media (min-width: 900px) {
-      .panel-left { width: 140px; height: 140px; }
-      .panel-right { width: 120px; height: 120px; }
-      .glass-button { width: 80px; height: 80px; }
+      .panel-top { height: 70px; }
+      .score-panel { font-size: 20px; padding: 10px 18px; }
     }
   </style>
 
@@ -115,176 +88,197 @@
 <body>
 
 <div class="hud-layer">
-  <div class="glass-panel panel-left">
-    <canvas id="joy-layer"></canvas>
-  </div>
-  <div class="glass-panel panel-right">
-    <div id="attack-btn" class="glass-button">SWING</div>
+  <div class="glass-panel panel-top">
+    <div class="score-panel" id="score-text">Distance: 0</div>
+    <div class="lives-panel">
+      <div class="heart"></div>
+      <div class="heart"></div>
+      <div class="heart"></div>
+    </div>
   </div>
 </div>
 
 <script>
-// Responsive, iPhone-friendly scaling [web:171][web:174][web:180]
 const config = {
   type: Phaser.AUTO,
   width: 800,
   height: 600,
-  backgroundColor: "#020617",
+  backgroundColor: "#87CEEB",
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
   physics: {
     default: "arcade",
-    arcade: { debug: false }
+    arcade: {
+      gravity: { y: 1200 },
+      debug: false
+    }
   },
   scene: { preload, create, update }
 };
 
 let game = new Phaser.Game(config);
 
-let player, monsters, swordHitbox;
-let score = 0, scoreText;
-let cursors;
-
-let joyPointer = null;
-let joyRadius = 60;
-let moveVector = { x: 0, y: 0 };
-
-let attacking = false;
-let canAttack = true;
+let dino, obstacles, coins;
+let score = 0, lives = 3;
+let gameSpeed = 200;
+let jumpTimer = 0;
+let isJumping = false;
+let cameraSpeed = 0;
+let bg1, bg2, fg1, fg2; // parallax layers [web:217][web:219]
 
 function preload() {}
 
 function create() {
   const g = this.add.graphics();
 
-  // player / monster / sword textures
-  g.fillStyle(0x38bdf8, 1);
-  g.fillRoundedRect(0, 0, 30, 30, 8);
-  g.generateTexture("playerBlue", 30, 30);
+  // Dino sprite (simple rounded rect)
+  g.fillStyle(0x4ecdc4, 1);
+  g.fillRoundedRect(0, 0, 48, 36, 8);
+  g.fillStyle(0x44a08d, 1);
+  g.fillRoundedRect(8, 4, 32, 24, 6);
+  g.lineStyle(2, 0x2c5530);
+  g.strokeRoundedRect(8, 4, 32, 24, 6);
+  g.generateTexture("dino", 48, 36);
   g.clear();
 
-  g.fillStyle(0xf97373, 1);
-  g.fillRoundedRect(0, 0, 26, 26, 8);
-  g.generateTexture("monsterRed", 26, 26);
+  // Cactus obstacle
+  g.fillStyle(0x27ae60, 1);
+  g.fillRoundedRect(0, 0, 24, 48, 8);
+  g.fillStyle(0x229954, 1);
+  g.fillRoundedRect(6, 6, 12, 36, 4);
+  g.generateTexture("cactus", 24, 48);
   g.clear();
 
-  g.fillStyle(0xfacc15, 0.7);
-  g.fillRoundedRect(0, 0, 36, 16, 6);
-  g.generateTexture("swordBox", 36, 16);
+  // Coin
+  g.fillStyle(0xffd700, 1);
+  g.fillCircle(12, 12, 12);
+  g.lineStyle(2, 0xd4af37);
+  g.strokeCircle(12, 12, 12);
+  g.generateTexture("coin", 24, 24);
   g.destroy();
 
-  // Player
-  player = this.physics.add.sprite(400, 300, "playerBlue");
-  player.setCollideWorldBounds(true);
-  player.speed = 220;
-  player.facing = "down";
+  // Dino
+  dino = this.physics.add.sprite(150, 400, "dino");
+  dino.setBounce(0.1);
+  dino.setCollideWorldBounds(false);
+  dino.body.setSize(32, 28);
 
-  // Sword hitbox
-  swordHitbox = this.physics.add.image(player.x, player.y, "swordBox");
-  swordHitbox.setVisible(false);
-  swordHitbox.body.enable = false;
+  // Groups
+  obstacles = this.physics.add.group();
+  coins = this.physics.add.group();
 
-  // Monster group
-  monsters = this.physics.add.group();
-  spawnMonsters.call(this, 6);
+  // Parallax backgrounds [web:217][web:219]
+  bg1 = this.add.tileSprite(0, 0, 800, 600, 0xe8f4f8).setOrigin(0).setScrollFactor(0);
+  bg2 = this.add.tileSprite(0, 0, 800, 600, 0x4682b4).setOrigin(0).setScrollFactor(0);
+  fg1 = this.add.tileSprite(0, 0, 800, 600, 0x90ee90).setOrigin(0).setScrollFactor(0);
 
-  // Keyboard
-  cursors = this.input.keyboard.createCursorKeys();
-
-  // Score
-  scoreText = this.add.text(16, 16, "Score: 0", {
-    font: "20px -apple-system, system-ui, sans-serif",
-    fill: "#e5e7eb"
-  });
+  // Ground collision
+  const platforms = this.physics.add.staticGroup();
+  platforms.create(400, 580, null).setSize(900, 40).setVisible(false);
+  this.physics.add.collider(dino, platforms);
 
   // Collisions
-  this.physics.add.overlap(swordHitbox, monsters, (s, m) => {
-    if (!attacking) return;
-    m.destroy();
-    score++;
-    scoreText.setText("Score: " + score);
-    if (monsters.countActive(true) === 0) {
-      spawnMonsters.call(this, 6 + Math.floor(score / 3));
-    }
-  });
+  this.physics.add.collider(dino, obstacles, hitObstacle);
+  this.physics.add.overlap(dino, coins, collectCoin);
 
-  this.physics.add.overlap(player, monsters, () => {
-    score = 0;
-    this.scene.restart();
-  });
-
-  // Virtual joystick touch handling (under glass panel) [web:145][web:148][web:152]
-  const joyPanelRect = document.querySelector(".panel-left").getBoundingClientRect();
-  const canvasOffsetX = joyPanelRect.left;
-  const canvasOffsetY = joyPanelRect.top;
-
+  // Input: tap anywhere, SPACE, or double-tap [web:212]
+  this.input.on("pointerdown", jump);
+  this.input.keyboard.on("keydown-SPACE", jump);
   this.input.on("pointerdown", (pointer) => {
-    // Limit joystick to left-bottom quadrant
-    if (pointer.x + canvasOffsetX < joyPanelRect.right &&
-        pointer.x + canvasOffsetX > joyPanelRect.left &&
-        pointer.y + canvasOffsetY < joyPanelRect.bottom &&
-        pointer.y + canvasOffsetY > joyPanelRect.top) {
-      joyPointer = pointer.id;
-      updateJoy(pointer, joyPanelRect);
-    }
+    if (Date.now() - jumpTimer < 250) jump.call(this); // double-tap
   });
 
-  this.input.on("pointermove", (pointer) => {
-    if (joyPointer === pointer.id) {
-      updateJoy(pointer, joyPanelRect);
-    }
-  });
-
-  this.input.on("pointerup", (pointer) => {
-    if (joyPointer === pointer.id) {
-      joyPointer = null;
-      moveVector.x = 0;
-      moveVector.y = 0;
-      drawJoyNeutral();
-    }
-  });
-
-  // Attack: HTML button plus keyboard SPACE [web:145][web:150]
-  const attackBtnEl = document.getElementById("attack-btn");
-  attackBtnEl.addEventListener("touchstart", (e) => {
-    e.preventDefault();
-    tryAttack.call(this);
-  }, { passive: false });
-  attackBtnEl.addEventListener("mousedown", (e) => {
-    e.preventDefault();
-    tryAttack.call(this);
-  });
-
-  this.input.keyboard.on("keydown-SPACE", () => {
-    tryAttack.call(this);
-  });
-
-  setupJoyCanvas();
+  updateUI();
 }
 
 function update(time, delta) {
-  handleMovement();
-  updateSwordHitbox();
-  moveMonsters();
-}
-
-function handleMovement() {
-  player.setVelocity(0);
-
-  // Keyboard movement
-  if (cursors.left && cursors.left.isDown) player.setVelocityX(-player.speed);
-  if (cursors.right && cursors.right.isDown) player.setVelocityX(player.speed);
-  if (cursors.up && cursors.up.isDown) player.setVelocityY(-player.speed);
-  if (cursors.down && cursors.down.isDown) player.setVelocityY(player.speed);
-
-  // Joystick movement overrides if active
-  if (moveVector.x !== 0 || moveVector.y !== 0) {
-    player.setVelocity(moveVector.x * player.speed, moveVector.y * player.speed);
+  // Dino animations
+  if (dino.body.touching.down) {
+    isJumping = false;
+    dino.setVelocityY(0);
+  } else {
+    dino.setVelocityY(Math.max(dino.body.velocity.y, -800));
   }
 
-  if (player.body.velocity.lengthSq() > 0) {
-    const vx = player.body.velocity.x;
-    const vy = player.body.velocity.y;
-    if (Math
+  // Generate endless obstacles and coins
+  if (score % 120 === 0) spawnObstacle.call(this);
+  if (score % 80 === 0) spawnCoin.call(this);
+
+  // Increase difficulty
+  cameraSpeed = Math.min(300 + score * 0.5, 800);
+  gameSpeed = Math.min(250 + score * 0.3, 600);
+
+  // Camera follows
+  this.cameras.main.scrollY = -(score * 2);
+
+  // Parallax scroll [web:217][web:219]
+  bg1.tilePositionY = -(this.cameras.main.scrollY * 0.2);
+  bg2.tilePositionY = -(this.cameras.main.scrollY * 0.4);
+  fg1.tilePositionY = -(this.cameras.main.scrollY * 0.8);
+
+  score++;
+  updateUI();
+
+  // Recycle off-screen items
+  obstacles.children.iterate(recycleOffscreen);
+  coins.children.iterate(recycleOffscreen);
+}
+
+function jump() {
+  if (isJumping || dino.body.touching.down === false) return;
+  isJumping = true;
+  jumpTimer = Date.now();
+  dino.setVelocityY(-650);
+}
+
+function spawnObstacle() {
+  const x = 850 + Math.random() * 200;
+  const obs = obstacles.create(x, 520, "cactus");
+  obs.body.setSize(20, 40);
+  obs.body.velocity.x = -gameSpeed;
+}
+
+function spawnCoin() {
+  const x = 850 + Math.random() * 300;
+  const y = 400 + Math.random() * 100;
+  const coin = coins.create(x, y, "coin");
+  coin.body.velocity.x = -gameSpeed;
+}
+
+function hitObstacle(dino, obs) {
+  obs.destroy();
+  lives--;
+  if (lives <= 0) {
+    this.scene.restart();
+    score = 0;
+    lives = 3;
+  }
+  updateUI();
+}
+
+function collectCoin(dino, coin) {
+  coin.destroy();
+  score += 10;
+}
+
+function recycleOffscreen(item) {
+  if (!item || !item.active) return;
+  if (item.x < -50) {
+    item.destroy();
+  }
+}
+
+function updateUI() {
+  document.getElementById("score-text").textContent = "Distance: " + Math.floor(score / 10);
+  const hearts = document.querySelectorAll(".heart");
+  hearts.forEach((heart, i) => {
+    heart.style.background = i < lives ? "#ff4757" : "#666";
+  });
+}
+</script>
+
+</body>
+</html>
+
