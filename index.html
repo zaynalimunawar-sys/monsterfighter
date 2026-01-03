@@ -2,107 +2,176 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Asteroid Defense</title>
+  <title>Asteroid Defense - Premium Edition</title>
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
   <style>
     :root {
       --safe-area-top: env(safe-area-inset-top);
       --safe-area-bottom: env(safe-area-inset-bottom);
+      --primary: #64c8ff;
+      --primary-glow: rgba(100, 200, 255, 0.4);
+      --danger: #ff6b9d;
+      --danger-glow: rgba(255, 107, 157, 0.4);
     }
 
     * {
       box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    @keyframes starTwinkle {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
     }
 
     body {
       margin: 0;
       padding: 0;
-      background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #2a3456 100%);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #000;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
       overflow: hidden;
       user-select: none;
       -webkit-user-select: none;
+      position: relative;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: 
+        radial-gradient(2px 2px at 20% 30%, white, transparent),
+        radial-gradient(2px 2px at 60% 70%, white, transparent),
+        radial-gradient(1px 1px at 50% 50%, white, transparent),
+        radial-gradient(1px 1px at 80% 10%, white, transparent),
+        radial-gradient(2px 2px at 90% 60%, white, transparent),
+        radial-gradient(1px 1px at 33% 80%, white, transparent),
+        radial-gradient(1px 1px at 70% 40%, white, transparent),
+        linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #2a3456 100%);
+      background-size: 200% 200%;
+      animation: starTwinkle 3s ease-in-out infinite;
+      z-index: 0;
+    }
+
+    #game-container {
+      position: relative;
+      z-index: 1;
     }
 
     canvas {
       display: block;
       margin: 0 auto;
       touch-action: none;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 100px rgba(100, 200, 255, 0.1);
+      border-radius: 8px;
     }
 
     .hud {
       position: fixed;
-      top: calc(var(--safe-area-top) + 20px);
-      left: 20px;
-      right: 20px;
+      top: calc(var(--safe-area-top) + 24px);
+      left: 24px;
+      right: 24px;
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
       z-index: 100;
-      gap: 20px;
+      gap: 16px;
     }
 
     .glass-card {
-      background: rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
-      border-radius: 20px;
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
-      padding: 20px 24px;
+      background: rgba(10, 14, 39, 0.85);
+      backdrop-filter: blur(30px) saturate(180%);
+      -webkit-backdrop-filter: blur(30px) saturate(180%);
+      border-radius: 24px;
+      border: 1px solid rgba(100, 200, 255, 0.2);
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      padding: 20px 28px;
+      animation: float 3s ease-in-out infinite;
     }
 
     .score-card {
       flex: 1;
-      max-width: 200px;
+      max-width: 220px;
+    }
+
+    .stat-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
 
     .score-label {
-      font-size: 11px;
-      font-weight: 600;
-      color: rgba(100, 200, 255, 0.8);
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--primary);
       text-transform: uppercase;
-      letter-spacing: 1.5px;
-      margin-bottom: 8px;
+      letter-spacing: 2px;
+      opacity: 0.8;
     }
 
     .score-value {
-      font-size: 36px;
-      font-weight: 700;
-      color: #ffffff;
+      font-size: 42px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #64c8ff 0%, #00d4ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
       font-family: "SF Mono", "Monaco", "Courier New", monospace;
-      letter-spacing: -1px;
-      text-shadow: 0 0 20px rgba(100, 200, 255, 0.5);
+      letter-spacing: -2px;
+      text-shadow: 0 0 30px var(--primary-glow);
+      line-height: 1;
+    }
+
+    .multiplier {
+      font-size: 14px;
+      color: #ffd700;
+      font-weight: 700;
+      margin-top: 4px;
     }
 
     .health-card {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
     }
 
     .health-label {
-      font-size: 11px;
-      font-weight: 600;
-      color: rgba(255, 107, 157, 0.8);
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--danger);
       text-transform: uppercase;
-      letter-spacing: 1.5px;
+      letter-spacing: 2px;
+      opacity: 0.8;
     }
 
     .hearts {
       display: flex;
-      gap: 8px;
+      gap: 10px;
     }
 
     .heart {
-      width: 36px;
-      height: 36px;
+      width: 42px;
+      height: 42px;
       background: linear-gradient(135deg, #ff6b9d 0%, #c44569 100%);
       border-radius: 50%;
       position: relative;
-      box-shadow: 0 4px 16px rgba(255, 107, 157, 0.4);
-      transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      box-shadow: 
+        0 6px 20px var(--danger-glow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      animation: pulse 2s ease-in-out infinite;
     }
 
     .heart::before {
@@ -112,40 +181,85 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
+      font-size: 24px;
       color: white;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
     .heart.lost {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(60, 60, 80, 0.3);
       box-shadow: none;
-      transform: scale(0.8);
-      opacity: 0.3;
+      transform: scale(0.7) rotate(180deg);
+      opacity: 0.2;
+      animation: none;
     }
 
     .wave-badge {
-      background: linear-gradient(135deg, rgba(100, 200, 255, 0.2) 0%, rgba(0, 212, 255, 0.2) 100%);
-      border: 2px solid rgba(100, 200, 255, 0.4);
-      padding: 12px 24px;
+      background: linear-gradient(135deg, rgba(100, 200, 255, 0.15) 0%, rgba(0, 212, 255, 0.15) 100%);
+      border: 2px solid rgba(100, 200, 255, 0.5);
+      padding: 14px 28px;
       border-radius: 50px;
-      color: #64c8ff;
+      color: var(--primary);
+      font-weight: 800;
+      font-size: 18px;
+      letter-spacing: 2px;
+      text-shadow: 0 0 20px var(--primary-glow);
+      box-shadow: 
+        0 0 30px var(--primary-glow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+
+    .difficulty-indicator {
+      position: fixed;
+      bottom: calc(var(--safe-area-bottom) + 24px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      background: rgba(10, 14, 39, 0.85);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 215, 0, 0.3);
+      border-radius: 16px;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .difficulty-label {
+      font-size: 12px;
       font-weight: 700;
-      font-size: 16px;
+      color: #ffd700;
+      text-transform: uppercase;
       letter-spacing: 1px;
-      text-shadow: 0 0 10px rgba(100, 200, 255, 0.5);
+    }
+
+    .difficulty-bar {
+      width: 120px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .difficulty-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4caf50, #ffc107, #ff5722);
+      border-radius: 3px;
+      transition: width 0.5s ease;
     }
 
     .modal {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.85);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      background: rgba(0, 0, 0, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       z-index: 200;
       align-items: center;
       justify-content: center;
-      animation: fadeIn 0.3s ease;
+      animation: fadeIn 0.4s ease;
     }
 
     @keyframes fadeIn {
@@ -158,90 +272,133 @@
     }
 
     .modal-content {
-      background: rgba(255, 255, 255, 0.95);
+      background: linear-gradient(145deg, rgba(10, 14, 39, 0.98), rgba(26, 31, 58, 0.98));
       backdrop-filter: blur(40px);
-      border-radius: 32px;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      padding: 48px;
+      border-radius: 40px;
+      border: 2px solid rgba(100, 200, 255, 0.3);
+      padding: 56px 64px;
       text-align: center;
-      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
-      animation: slideUp 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      box-shadow: 
+        0 30px 90px rgba(0, 0, 0, 0.7),
+        0 0 100px rgba(100, 200, 255, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      animation: slideUp 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      max-width: 500px;
     }
 
     @keyframes slideUp {
-      from { transform: translateY(40px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
+      from { transform: translateY(60px) scale(0.9); opacity: 0; }
+      to { transform: translateY(0) scale(1); opacity: 1; }
     }
 
     .modal-title {
-      font-size: 42px;
-      font-weight: 800;
+      font-size: 52px;
+      font-weight: 900;
       background: linear-gradient(135deg, #64c8ff 0%, #00d4ff 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      margin: 0 0 24px 0;
-      letter-spacing: -1px;
+      margin: 0 0 32px 0;
+      letter-spacing: -2px;
+      text-transform: uppercase;
+      text-shadow: 0 0 40px var(--primary-glow);
     }
 
     .modal-score {
-      font-size: 64px;
-      font-weight: 800;
-      background: linear-gradient(135deg, #ff6b9d 0%, #c44569 100%);
+      font-size: 80px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #ff6b9d 0%, #ffd700 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       font-family: "SF Mono", "Monaco", monospace;
-      margin: 0 0 12px 0;
-      letter-spacing: -2px;
+      margin: 0 0 16px 0;
+      letter-spacing: -3px;
+      text-shadow: 0 0 50px var(--danger-glow);
     }
 
-    .modal-wave {
-      font-size: 18px;
-      color: #666;
-      margin-bottom: 32px;
-      font-weight: 500;
+    .modal-stats {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      margin: 24px 0 40px 0;
+    }
+
+    .modal-stat {
+      text-align: center;
+    }
+
+    .modal-stat-label {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 8px;
+    }
+
+    .modal-stat-value {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--primary);
+      font-family: monospace;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
     }
 
     .modal-button {
       background: linear-gradient(135deg, #64c8ff 0%, #00d4ff 100%);
       color: white;
       border: none;
-      padding: 16px 48px;
+      padding: 18px 48px;
       border-radius: 50px;
       font-size: 18px;
-      font-weight: 700;
+      font-weight: 800;
       cursor: pointer;
-      box-shadow: 0 8px 24px rgba(100, 200, 255, 0.4);
+      box-shadow: 
+        0 8px 24px var(--primary-glow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
       transition: all 0.3s ease;
-      margin-top: 16px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
     }
 
     .modal-button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 12px 32px rgba(100, 200, 255, 0.5);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 36px var(--primary-glow);
     }
 
     .modal-button:active {
-      transform: translateY(0);
+      transform: translateY(-1px);
     }
 
     @media (max-width: 600px) {
-      .hud { top: calc(var(--safe-area-top) + 12px); left: 12px; right: 12px; }
-      .glass-card { padding: 16px 20px; }
-      .score-value { font-size: 28px; }
-      .heart { width: 32px; height: 32px; }
-      .modal-content { padding: 36px; margin: 20px; }
-      .modal-title { font-size: 32px; }
-      .modal-score { font-size: 48px; }
+      .hud { top: calc(var(--safe-area-top) + 16px); left: 16px; right: 16px; }
+      .glass-card { padding: 16px 20px; border-radius: 20px; }
+      .score-value { font-size: 32px; }
+      .heart { width: 36px; height: 36px; }
+      .heart::before { font-size: 20px; }
+      .modal-content { padding: 40px; margin: 20px; border-radius: 32px; }
+      .modal-title { font-size: 36px; }
+      .modal-score { font-size: 56px; }
+      .modal-stats { flex-direction: column; gap: 16px; }
+      .difficulty-indicator { bottom: calc(var(--safe-area-bottom) + 16px); }
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.85.0/dist/phaser.js"></script>
 </head>
 <body>
 
+<div id="game-container"></div>
+
 <div class="hud">
   <div class="glass-card score-card">
-    <div class="score-label">Score</div>
-    <div class="score-value" id="score-text">0</div>
+    <div class="stat-group">
+      <div class="score-label">Score</div>
+      <div class="score-value" id="score-text">0</div>
+      <div class="multiplier" id="multiplier-text"></div>
+    </div>
   </div>
 
   <div class="glass-card health-card">
@@ -256,12 +413,34 @@
   <div class="glass-card wave-badge" id="wave-text">WAVE 1</div>
 </div>
 
+<div class="difficulty-indicator">
+  <div class="difficulty-label">DIFFICULTY</div>
+  <div class="difficulty-bar">
+    <div class="difficulty-fill" id="difficulty-fill" style="width: 10%"></div>
+  </div>
+</div>
+
 <div class="modal" id="game-over-modal">
   <div class="modal-content">
-    <h1 class="modal-title">GAME OVER</h1>
+    <h1 class="modal-title">Game Over</h1>
     <div class="modal-score" id="modal-score">0</div>
-    <div class="modal-wave" id="modal-wave">Reached Wave 1</div>
-    <button class="modal-button" onclick="location.reload()">Play Again</button>
+    <div class="modal-stats">
+      <div class="modal-stat">
+        <div class="modal-stat-label">Wave</div>
+        <div class="modal-stat-value" id="modal-wave">1</div>
+      </div>
+      <div class="modal-stat">
+        <div class="modal-stat-label">Kills</div>
+        <div class="modal-stat-value" id="modal-kills">0</div>
+      </div>
+      <div class="modal-stat">
+        <div class="modal-stat-label">Accuracy</div>
+        <div class="modal-stat-value" id="modal-accuracy">0%</div>
+      </div>
+    </div>
+    <div class="modal-buttons">
+      <button class="modal-button" onclick="location.reload()">Play Again</button>
+    </div>
   </div>
 </div>
 
@@ -269,8 +448,9 @@
 const config = {
   type: Phaser.AUTO,
   width: 800,
-  height: 400,
-  backgroundColor: "#0a0e27",
+  height: 500,
+  backgroundColor: "transparent",
+  parent: "game-container",
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
@@ -287,61 +467,68 @@ const config = {
 
 let game = new Phaser.Game(config);
 
-let player, particles, explosionParticles;
+let player, particles, explosionParticles, trailParticles;
 let score = 0;
 let health = 3;
 let wave = 1;
+let kills = 0;
+let shotsFired = 0;
+let shotsHit = 0;
 let isGameOver = false;
 let spawnTimer = 0;
 let spawnRate = 2000;
 let bulletsGroup;
 let asteroidsGroup;
 let isInvulnerable = false;
-
-// DIFFICULTY SCALING BASED ON SCORE
 let baseSpeed = 100;
 let speedIncrement = 0;
-let asteroidSizeMultiplier = 1;
 
 function preload() {
   const g = this.add.graphics();
 
-  // Player ship
+  // Premium player ship with glow
   g.fillStyle(0x64c8ff);
   g.beginPath();
-  g.moveTo(20, 0);
-  g.lineTo(0, 36);
-  g.lineTo(40, 36);
+  g.moveTo(24, 0);
+  g.lineTo(0, 40);
+  g.lineTo(12, 36);
+  g.lineTo(24, 40);
+  g.lineTo(36, 36);
+  g.lineTo(48, 40);
   g.closePath();
   g.fillPath();
-  g.lineStyle(2, 0xffffff, 0.5);
+  g.lineStyle(3, 0xffffff, 0.6);
   g.strokePath();
-  g.generateTexture("player", 40, 36);
+  g.fillStyle(0xffffff);
+  g.fillCircle(24, 20, 4);
+  g.generateTexture("player", 48, 40);
   g.clear();
 
-  // Asteroid
+  // Premium asteroid with detail
   g.fillStyle(0xff8c42);
-  g.fillCircle(18, 18, 16);
+  g.fillCircle(20, 20, 18);
   g.lineStyle(3, 0xffaa55);
-  g.strokeCircle(18, 18, 16);
-  g.fillStyle(0xffaa55);
-  g.fillCircle(12, 12, 4);
-  g.fillCircle(24, 16, 3);
-  g.fillCircle(16, 22, 3);
-  g.generateTexture("asteroid", 36, 36);
+  g.strokeCircle(20, 20, 18);
+  g.fillStyle(0xd4722b);
+  g.fillCircle(14, 14, 5);
+  g.fillCircle(26, 18, 4);
+  g.fillCircle(18, 26, 3);
+  g.lineStyle(2, 0xffaa55);
+  g.strokeCircle(14, 14, 5);
+  g.generateTexture("asteroid", 40, 40);
   g.clear();
 
-  // Bullet
+  // Premium bullet with glow trail
   g.fillStyle(0x64c8ff);
-  g.fillRoundedRect(0, 0, 6, 16, 3);
-  g.lineStyle(1, 0xffffff, 0.8);
-  g.strokeRoundedRect(0, 0, 6, 16, 3);
-  g.generateTexture("bullet", 6, 16);
+  g.fillRoundedRect(0, 0, 8, 20, 4);
+  g.fillStyle(0xffffff);
+  g.fillRoundedRect(2, 2, 4, 16, 2);
+  g.generateTexture("bullet", 8, 20);
   g.destroy();
 }
 
 function create() {
-  player = this.physics.add.sprite(400, 340, "player");
+  player = this.physics.add.sprite(400, 440, "player");
   player.setCollideWorldBounds(true);
   player.setImmovable(true);
 
@@ -350,21 +537,18 @@ function create() {
   
   particles = this.add.particles(0x64c8ff);
   explosionParticles = this.add.particles(0xff8c42);
-
-  this.add.rectangle(400, 390, 800, 20, 0x1a4d4d, 0.3).setOrigin(0.5);
+  trailParticles = this.add.particles(0x64c8ff);
 
   // Input
   this.input.on("pointermove", (pointer) => {
-    if (!isGameOver) {
-      player.x = Phaser.Math.Clamp(pointer.x, 40, 760);
-    }
+    if (!isGameOver) player.x = Phaser.Math.Clamp(pointer.x, 40, 760);
   });
 
   this.input.keyboard.on("keydown-LEFT", () => {
-    if (!isGameOver) player.x = Phaser.Math.Clamp(player.x - 25, 40, 760);
+    if (!isGameOver) player.x = Phaser.Math.Clamp(player.x - 30, 40, 760);
   });
   this.input.keyboard.on("keydown-RIGHT", () => {
-    if (!isGameOver) player.x = Phaser.Math.Clamp(player.x + 25, 40, 760);
+    if (!isGameOver) player.x = Phaser.Math.Clamp(player.x + 30, 40, 760);
   });
 
   this.input.on("pointerdown", shoot, this);
@@ -379,14 +563,8 @@ function create() {
 function update(time, delta) {
   if (isGameOver) return;
 
-  // PROGRESSIVE DIFFICULTY: Speed increases every 50 points
   speedIncrement = Math.floor(score / 50) * 20;
-  
-  // PROGRESSIVE DIFFICULTY: Spawn rate gets faster
-  spawnRate = Math.max(2000 - Math.floor(score / 30) * 100, 800);
-  
-  // PROGRESSIVE DIFFICULTY: More asteroids appear
-  const asteroidsPerWave = 3 + Math.floor(score / 100);
+  spawnRate = Math.max(2000 - Math.floor(score / 30) * 100, 700);
 
   spawnTimer += delta;
   if (spawnTimer > spawnRate) {
@@ -399,47 +577,58 @@ function update(time, delta) {
   });
 
   asteroidsGroup.children.iterate(asteroid => {
-    if (asteroid && asteroid.y > 410) asteroid.destroy();
+    if (asteroid && asteroid.y > 520) asteroid.destroy();
   });
 
   if (asteroidsGroup.countActive(true) === 0 && spawnTimer > 500) {
     nextWave.call(this);
   }
 
+  // Update HUD
   document.getElementById("score-text").textContent = score;
   document.getElementById("wave-text").textContent = "WAVE " + wave;
+  
+  const difficultyPercent = Math.min((score / 500) * 100, 100);
+  document.getElementById("difficulty-fill").style.width = difficultyPercent + "%";
+  
+  if (score > 0 && score % 50 === 0) {
+    document.getElementById("multiplier-text").textContent = "×" + (1 + Math.floor(score / 100));
+  }
 }
 
 function spawnAsteroid() {
   const x = Phaser.Math.Between(60, 740);
-  const y = 30;
+  const y = 20;
 
   const ast = asteroidsGroup.create(x, y, "asteroid");
-  
-  // PROGRESSIVE DIFFICULTY: Asteroids fall faster based on score
   const fallSpeed = baseSpeed + speedIncrement + wave * 15;
   ast.body.setVelocityY(fallSpeed);
-  
-  ast.body.setCircle(16);
+  ast.body.setCircle(18);
   ast.setScale(0);
+  ast.setRotation(Phaser.Math.FloatBetween(0, Math.PI * 2));
   
   this.tweens.add({
     targets: ast,
     scale: 1,
-    duration: 300,
-    ease: 'Back.easeOut'
+    duration: 400,
+    ease: 'Elastic.easeOut'
+  });
+  
+  this.tweens.add({
+    targets: ast,
+    rotation: ast.rotation + Math.PI * 2,
+    duration: 3000,
+    repeat: -1
   });
 }
 
 function spawnWave() {
   asteroidsGroup.clear(true, true);
   spawnTimer = 0;
-  
-  // PROGRESSIVE DIFFICULTY: More asteroids per wave
   const count = 3 + Math.floor(score / 80) + wave;
   
   for (let i = 0; i < count; i++) {
-    this.time.delayedCall(i * 400, () => {
+    this.time.delayedCall(i * 350, () => {
       spawnAsteroid.call(this);
     });
   }
@@ -447,23 +636,38 @@ function spawnWave() {
 
 function shoot() {
   if (isGameOver) return;
-  const bullet = bulletsGroup.create(player.x, player.y - 18, "bullet");
-  bullet.setVelocityY(-650);
+  shotsFired++;
+  
+  const bullet = bulletsGroup.create(player.x, player.y - 20, "bullet");
+  bullet.setVelocityY(-700);
+  
+  // Bullet trail
+  trailParticles.createEmitter({
+    follow: bullet,
+    quantity: 2,
+    scale: { start: 0.4, end: 0 },
+    alpha: { start: 0.8, end: 0 },
+    lifespan: 200,
+    blendMode: 'ADD'
+  });
 }
 
 function hitAsteroid(bullet, asteroid) {
   bullet.destroy();
+  shotsHit++;
+  kills++;
 
-  particles.emitParticleAt(asteroid.x, asteroid.y, 25);
-  explosionParticles.emitParticleAt(asteroid.x, asteroid.y, 15);
+  particles.emitParticleAt(asteroid.x, asteroid.y, 30);
+  explosionParticles.emitParticleAt(asteroid.x, asteroid.y, 20);
 
   score += 10;
 
   this.tweens.add({
     targets: asteroid,
-    scale: 0,
+    scale: 1.5,
     alpha: 0,
-    duration: 150,
+    duration: 200,
+    ease: 'Power2',
     onComplete: () => asteroid.destroy()
   });
 }
@@ -482,14 +686,14 @@ function hitPlayer(player, asteroid) {
   const flashInterval = setInterval(() => {
     player.alpha = player.alpha === 1 ? 0.3 : 1;
     flashCount++;
-    if (flashCount >= 8) {
+    if (flashCount >= 10) {
       clearInterval(flashInterval);
       player.alpha = 1;
       isInvulnerable = false;
     }
-  }, 100);
+  }, 80);
 
-  explosionParticles.emitParticleAt(player.x, player.y, 30);
+  explosionParticles.emitParticleAt(player.x, player.y, 40);
 
   if (health <= 0) {
     endGame.call(this);
@@ -504,8 +708,13 @@ function nextWave() {
 function endGame() {
   isGameOver = true;
   player.setTint(0xff6b9d);
+  
+  const accuracy = shotsFired > 0 ? Math.round((shotsHit / shotsFired) * 100) : 0;
+  
   document.getElementById("modal-score").textContent = score;
-  document.getElementById("modal-wave").textContent = "Reached Wave " + wave;
+  document.getElementById("modal-wave").textContent = wave;
+  document.getElementById("modal-kills").textContent = kills;
+  document.getElementById("modal-accuracy").textContent = accuracy + "%";
   document.getElementById("game-over-modal").classList.add("active");
 }
 </script>
