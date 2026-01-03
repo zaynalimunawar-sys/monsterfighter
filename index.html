@@ -2,12 +2,12 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Simple Collect Game</title>
+  <title>Monster Tap Fight</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
   <style>
     body { margin: 0; background: #111; }
-    canvas { display: block; margin: 0 auto; }
+    canvas { display: block; margin: 0 auto; touch-action: none; }
   </style>
-  <!-- Phaser 3 from CDN -->
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.85.0/dist/phaser.js"></script>
 </head>
 <body>
@@ -27,59 +27,176 @@ const config = {
 
 let game = new Phaser.Game(config);
 
-let player, cursors, coins, score = 0, scoreText;
+let player, monsters, bullets;
+let cursors;
+let lastFired = 0;
+let score = 0, scoreText;
+
+// touch button flags
+let moveLeft = false;
+let moveRight = false;
+let shooting = false;
 
 function preload() {}
 
 function create() {
   const g = this.add.graphics();
 
-  // player: green square
-  g.fillStyle(0x00ff00, 1);
+  // player: blue square
+  g.fillStyle(0x3399ff, 1);
   g.fillRect(0, 0, 32, 32);
-  g.generateTexture("playerGreen", 32, 32);
+  g.generateTexture("playerBlue", 32, 32);
   g.clear();
 
-  // coin: yellow circle
-  g.fillStyle(0xffff00, 1);
-  g.fillCircle(8, 8, 8);
-  g.generateTexture("coinYellow", 16, 16);
+  // monster: red square
+  g.fillStyle(0xff3333, 1);
+  g.fillRect(0, 0, 28, 28);
+  g.generateTexture("monsterRed", 28, 28);
+  g.clear();
+
+  // bullet: white rectangle
+  g.fillStyle(0xffffff, 1);
+  g.fillRect(0, 0, 6, 12);
+  g.generateTexture("bullet", 6, 12);
   g.destroy();
 
-  player = this.physics.add.sprite(400, 300, "playerGreen");
+  // player
+  player = this.physics.add.sprite(400, 520, "playerBlue");
   player.setCollideWorldBounds(true);
-  player.speed = 200;
+  player.speed = 220;
 
-  coins = this.physics.add.group();
-  spawnCoin.call(this);
+  // bullets
+  bullets = this.physics.add.group({
+    defaultKey: "bullet",
+    maxSize: 50
+  });
 
+  // monsters
+  monsters = this.physics.add.group();
+  spawnWave.call(this, 5);
+
+  // keyboard (still works on desktop)
   cursors = this.input.keyboard.createCursorKeys();
 
+  // score text
   scoreText = this.add.text(10, 10, "Score: 0", { font: "20px Arial", fill: "#ffffff" });
-  this.add.text(10, 35, "Move: Arrows", { font: "16px Arial", fill: "#ffffff" });
 
-  this.physics.add.overlap(player, coins, (p, coin) => {
-    coin.destroy();
+  // collisions
+  this.physics.add.overlap(bullets, monsters, (bullet, monster) => {
+    bullet.destroy();
+    monster.destroy();
     score++;
     scoreText.setText("Score: " + score);
-    spawnCoin.call(this);
+    if (monsters.countActive(true) === 0) {
+      // new wave, slightly harder
+      spawnWave.call(this, 5 + Math.floor(score / 5));
+    }
+  });
+
+  this.physics.add.overlap(player, monsters, () => {
+    // simple "death": reset score and restart
+    score = 0;
+    this.scene.restart();
+  });
+
+  // === TOUCH BUTTONS ===
+  const btnSize = 70;
+  const btnAlpha = 0.4;
+
+  // Left button
+  const leftBtn = this.add.rectangle(80, 520, btnSize, btnSize, 0x00ff00, btnAlpha)
+    .setScrollFactor(0)
+    .setInteractive();
+  this.add.text(70, 510, "◀", { font: "32px Arial", fill: "#000000" }).setScrollFactor(0);
+
+  // Right button
+  const rightBtn = this.add.rectangle(190, 520, btnSize, btnSize, 0x00ff00, btnAlpha)
+    .setScrollFactor(0)
+    .setInteractive();
+  this.add.text(180, 510, "▶", { font: "32px Arial", fill: "#000000" }).setScrollFactor(0);
+
+  // Shoot button
+  const shootBtn = this.add.rectangle(720, 520, btnSize, btnSize, 0xffcc00, btnAlpha)
+    .setScrollFactor(0)
+    .setInteractive();
+  this.add.text(702, 510, "FIRE", { font: "18px Arial", fill: "#000000" }).setScrollFactor(0);
+
+  // touch / mouse events for buttons (works on mobile and desktop) [web:145][web:150]
+  leftBtn.on("pointerdown", () => { moveLeft = true; });
+  leftBtn.on("pointerup", () => { moveLeft = false; });
+  leftBtn.on("pointerout", () => { moveLeft = false; });
+
+  rightBtn.on("pointerdown", () => { moveRight = true; });
+  rightBtn.on("pointerup", () => { moveRight = false; });
+  rightBtn.on("pointerout", () => { moveRight = false; });
+
+  shootBtn.on("pointerdown", () => { shooting = true; });
+  shootBtn.on("pointerup", () => { shooting = false; });
+  shootBtn.on("pointerout", () => { shooting = false; });
+}
+
+function update(time) {
+  handleMovement();
+  handleShooting(this, time);
+  moveMonsters();
+}
+
+function handleMovement() {
+  player.setVelocityX(0);
+
+  // keyboard (desktop) [web:150]
+  if (cursors.left && cursors.left.isDown) player.setVelocityX(-player.speed);
+  if (cursors.right && cursors.right.isDown) player.setVelocityX(player.speed);
+
+  // touch buttons override keyboard
+  if (moveLeft) player.setVelocityX(-player.speed);
+  if (moveRight) player.setVelocityX(player.speed);
+}
+
+function handleShooting(scene, time) {
+  // keyboard shoot with space if you want to add: cursors.space
+  const wantShoot = shooting;
+
+  if (!wantShoot) return;
+  if (time <= lastFired + 250) return;
+
+  lastFired = time;
+
+  const bullet = bullets.get(player.x, player.y - 24);
+  if (!bullet) return;
+
+  bullet.setActive(true);
+  bullet.setVisible(true);
+  bullet.body.enable = true;
+  bullet.setVelocity(0, -350);
+
+  // auto destroy when offscreen
+  scene.time.delayedCall(2000, () => {
+    if (bullet && bullet.active) bullet.destroy();
   });
 }
 
-function update() {
-  player.setVelocity(0);
+function spawnWave(count) {
+  const scene = this;
+  monsters.clear(true, true);
 
-  if (cursors.left.isDown) player.setVelocityX(-player.speed);
-  else if (cursors.right.isDown) player.setVelocityX(player.speed);
-
-  if (cursors.up.isDown) player.setVelocityY(-player.speed);
-  else if (cursors.down.isDown) player.setVelocityY(player.speed);
+  for (let i = 0; i < count; i++) {
+    const x = Phaser.Math.Between(50, 750);
+    const y = Phaser.Math.Between(50, 200);
+    const m = monsters.create(x, y, "monsterRed");
+    m.speed = Phaser.Math.Between(40, 90) + score * 2; // a bit faster as score increases
+  }
 }
 
-function spawnCoin() {
-  const x = Phaser.Math.Between(50, 750);
-  const y = Phaser.Math.Between(50, 550);
-  coins.create(x, y, "coinYellow");
+function moveMonsters() {
+  monsters.children.iterate(m => {
+    if (!m || !m.active) return;
+    // simple vertical back-and-forth motion
+    if (!m.direction) m.direction = 1;
+    m.y += 0.5 * m.direction;
+    if (m.y < 40) m.direction = 1;
+    if (m.y > 260) m.direction = -1;
+  });
 }
 </script>
 
