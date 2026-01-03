@@ -32,11 +32,6 @@
       50% { transform: translateY(-10px); }
     }
 
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-    }
-
     @keyframes glitchText {
       0%, 100% { 
         transform: translate(0) skew(0deg);
@@ -58,21 +53,6 @@
           3px 0 var(--danger);
       }
       16% { 
-        transform: translate(0) skew(0deg);
-      }
-      49% { 
-        transform: translate(0) skew(0deg);
-      }
-      50% { 
-        transform: translate(2px, 2px) skew(1deg);
-        text-shadow: 
-          -2px 0 var(--primary), 
-          2px 0 var(--danger);
-      }
-      51% { 
-        transform: translate(-2px, -2px) skew(-1deg);
-      }
-      52% { 
         transform: translate(0) skew(0deg);
       }
     }
@@ -181,7 +161,6 @@
       z-index: 0;
     }
 
-    /* START SCREEN */
     .start-screen {
       position: fixed;
       inset: 0;
@@ -229,7 +208,6 @@
       top: 10%;
       left: 20%;
       animation: meteorShower 3s ease-in-out infinite;
-      animation-delay: 0s;
     }
 
     .meteor:nth-child(2) {
@@ -344,10 +322,6 @@
 
     .start-button:active {
       transform: scale(0.96);
-      box-shadow: 
-        0 0 20px var(--primary-glow),
-        0 4px 16px rgba(0, 0, 0, 0.4),
-        inset 0 2px 0 rgba(255, 255, 255, 0.4);
     }
 
     .instruction-text {
@@ -462,7 +436,6 @@
       -webkit-text-fill-color: transparent;
       font-family: "SF Mono", "Monaco", "Courier New", monospace;
       letter-spacing: -1px;
-      text-shadow: 0 0 30px var(--primary-glow);
       line-height: 1;
     }
 
@@ -638,7 +611,6 @@
       margin: 0 0 20px 0;
       letter-spacing: -2px;
       text-transform: uppercase;
-      text-shadow: 0 0 40px var(--primary-glow);
     }
 
     .modal-score {
@@ -650,7 +622,6 @@
       font-family: "SF Mono", "Monaco", monospace;
       margin: 0 0 16px 0;
       letter-spacing: -2px;
-      text-shadow: 0 0 50px var(--danger-glow);
     }
 
     .modal-stats {
@@ -707,7 +678,6 @@
       transform: scale(0.95);
     }
 
-    /* DESKTOP/LANDSCAPE */
     @media (min-width: 900px) {
       .logo-icon { font-size: 120px; }
       .logo-text { font-size: 64px; letter-spacing: 12px; }
@@ -737,7 +707,6 @@
 </head>
 <body>
 
-<!-- START SCREEN -->
 <div class="start-screen" id="start-screen">
   <div class="scan-effect">
     <div class="scan-line"></div>
@@ -745,7 +714,7 @@
     <div class="meteor"></div>
     <div class="meteor"></div>
   </div>
-  
+
   <div class="logo-container">
     <div class="logo-icon">🛸</div>
     <div class="logo-text">ASTEROID</div>
@@ -761,11 +730,11 @@
 
   <div class="feature-badges">
     <div class="badge">🎮 Premium</div>
-    <div class="badge">⚡ Fast-Paced</div>
+    <div class="badge">⚡ Drag-to-Fire</div>
     <div class="badge">🏆 Competitive</div>
   </div>
 
-  <div class="instruction-text">Swipe or use arrow keys to move<br>Tap or press space to shoot</div>
+  <div class="instruction-text">Drag or move to shoot automatically<br>Rapid fire enabled!</div>
 </div>
 
 <div id="game-container"></div>
@@ -831,21 +800,23 @@ document.getElementById('start-btn').addEventListener('click', startGame);
 function startGame() {
   if (gameStarted) return;
   gameStarted = true;
-  
+
   document.getElementById('start-screen').classList.add('hidden');
   document.getElementById('game-container').classList.add('active');
   document.getElementById('hud').classList.add('active');
   document.getElementById('difficulty-indicator').classList.add('active');
-  
-  initPhaserGame();
+
+  setTimeout(() => {
+    initPhaserGame();
+  }, 100);
 }
 
 function initPhaserGame() {
   const isMobile = window.innerWidth < 600;
   const isPortrait = window.innerHeight > window.innerWidth;
-  
+
   let gameWidth, gameHeight;
-  
+
   if (isMobile && isPortrait) {
     gameWidth = Math.min(window.innerWidth, 400);
     gameHeight = Math.min(window.innerHeight * 0.65, 650);
@@ -877,7 +848,7 @@ function initPhaserGame() {
   phaserGame = new Phaser.Game(config);
 }
 
-let player, particles, explosionParticles, trailParticles;
+let player, particles, explosionParticles;
 let score = 0;
 let health = 3;
 let wave = 1;
@@ -887,11 +858,16 @@ let shotsHit = 0;
 let isGameOver = false;
 let spawnTimer = 0;
 let spawnRate = 2000;
+let fireTimer = 0;
+let fireRate = 100; // FASTER: 100ms (was 180ms)
 let bulletsGroup;
 let asteroidsGroup;
 let isInvulnerable = false;
 let baseSpeed = 100;
 let speedIncrement = 0;
+let gameScene;
+let lastPlayerX = 0;
+let moveThreshold = 1; // More sensitive
 
 function preload() {
   const g = this.add.graphics();
@@ -931,202 +907,314 @@ function preload() {
   g.fillStyle(0xffffff);
   g.fillRoundedRect(2, 2, 4, 16, 2);
   g.generateTexture("bullet", 8, 20);
+
+  // Explosion particle
+  g.clear();
+  g.fillStyle(0xffffff);
+  g.fillCircle(3, 3, 3);
+  g.generateTexture("particle", 6, 6);
+
   g.destroy();
 }
 
 function create() {
-  const centerX = this.sys.canvas.width / 2;
-  const bottomY = this.sys.canvas.height - 60;
+  try {
+    gameScene = this;
 
-  player = this.physics.add.sprite(centerX, bottomY, "player");
-  player.setCollideWorldBounds(true);
-  player.setImmovable(true);
+    const centerX = this.sys.canvas.width / 2;
+    const bottomY = this.sys.canvas.height - 60;
 
-  bulletsGroup = this.physics.add.group();
-  asteroidsGroup = this.physics.add.group();
-  
-  particles = this.add.particles(0x64c8ff);
-  explosionParticles = this.add.particles(0xff8c42);
-  trailParticles = this.add.particles(0x64c8ff);
+    player = this.physics.add.sprite(centerX, bottomY, "player");
+    player.setCollideWorldBounds(true);
+    player.setImmovable(true);
 
-  this.input.on("pointermove", (pointer) => {
-    if (!isGameOver) {
-      const minX = 40;
-      const maxX = this.sys.canvas.width - 40;
-      player.x = Phaser.Math.Clamp(pointer.x, minX, maxX);
-    }
-  });
+    lastPlayerX = player.x;
 
-  this.input.keyboard.on("keydown-LEFT", () => {
-    if (!isGameOver) player.x = Phaser.Math.Clamp(player.x - 30, 40, this.sys.canvas.width - 40);
-  });
-  this.input.keyboard.on("keydown-RIGHT", () => {
-    if (!isGameOver) player.x = Phaser.Math.Clamp(player.x + 30, 40, this.sys.canvas.width - 40);
-  });
+    bulletsGroup = this.physics.add.group();
+    asteroidsGroup = this.physics.add.group();
 
-  this.input.on("pointerdown", shoot, this);
-  this.input.keyboard.on("keydown-SPACE", shoot, this);
+    particles = this.add.particles("particle");
+    explosionParticles = this.add.particles("particle");
 
-  this.physics.add.overlap(bulletsGroup, asteroidsGroup, hitAsteroid, null, this);
-  this.physics.add.overlap(player, asteroidsGroup, hitPlayer, null, this);
+    this.input.on("pointermove", (pointer) => {
+      if (!isGameOver && player && player.active) {
+        const minX = 40;
+        const maxX = this.sys.canvas.width - 40;
+        player.x = Phaser.Math.Clamp(pointer.x, minX, maxX);
+      }
+    });
 
-  spawnWave.call(this);
+    this.input.keyboard.on("keydown-LEFT", () => {
+      if (!isGameOver && player && player.active) {
+        player.x = Phaser.Math.Clamp(player.x - 30, 40, this.sys.canvas.width - 40);
+      }
+    });
+
+    this.input.keyboard.on("keydown-RIGHT", () => {
+      if (!isGameOver && player && player.active) {
+        player.x = Phaser.Math.Clamp(player.x + 30, 40, this.sys.canvas.width - 40);
+      }
+    });
+
+    this.physics.add.overlap(bulletsGroup, asteroidsGroup, hitAsteroid, null, this);
+    this.physics.add.overlap(player, asteroidsGroup, hitPlayer, null, this);
+
+    spawnWave.call(this);
+  } catch (error) {
+    console.error("Create error:", error);
+  }
 }
 
 function update(time, delta) {
-  if (isGameOver) return;
+  try {
+    if (isGameOver || !player || !player.active) return;
 
-  speedIncrement = Math.floor(score / 50) * 20;
-  spawnRate = Math.max(2000 - Math.floor(score / 30) * 100, 700);
+    const distMoved = Math.abs(player.x - lastPlayerX);
+    const isMoving = distMoved > moveThreshold;
 
-  spawnTimer += delta;
-  if (spawnTimer > spawnRate) {
-    spawnTimer = 0;
-    spawnAsteroid.call(this);
-  }
+    if (!isMoving) {
+      fireTimer = 0;
+    }
 
-  bulletsGroup.children.iterate(bullet => {
-    if (bullet && bullet.y < -20) bullet.destroy();
-  });
+    lastPlayerX = player.x;
 
-  asteroidsGroup.children.iterate(asteroid => {
-    if (asteroid && asteroid.y > this.sys.canvas.height + 20) asteroid.destroy();
-  });
+    speedIncrement = Math.floor(score / 50) * 20;
+    spawnRate = Math.max(2000 - Math.floor(score / 30) * 100, 800);
 
-  if (asteroidsGroup.countActive(true) === 0 && spawnTimer > 500) {
-    nextWave.call(this);
-  }
+    if (isMoving) {
+      fireTimer += delta;
+      if (fireTimer >= fireRate) {
+        fireTimer = 0;
+        shoot.call(this);
+      }
+    }
 
-  document.getElementById("score-text").textContent = score;
-  document.getElementById("wave-text").textContent = "WAVE " + wave;
-  
-  const difficultyPercent = Math.min((score / 500) * 100, 100);
-  document.getElementById("difficulty-fill").style.width = difficultyPercent + "%";
-  
-  if (score > 0 && score % 50 === 0) {
-    document.getElementById("multiplier-text").textContent = "×" + (1 + Math.floor(score / 100));
+    spawnTimer += delta;
+    if (spawnTimer >= spawnRate) {
+      spawnTimer = 0;
+      spawnAsteroid.call(this);
+    }
+
+    bulletsGroup.children.entries.forEach(bullet => {
+      if (bullet && bullet.active && bullet.y < -30) {
+        bullet.destroy();
+      }
+    });
+
+    asteroidsGroup.children.entries.forEach(asteroid => {
+      if (asteroid && asteroid.active && asteroid.y > this.sys.canvas.height + 30) {
+        asteroid.destroy();
+      }
+    });
+
+    if (asteroidsGroup.countActive(true) === 0 && spawnTimer > 1000) {
+      nextWave.call(this);
+    }
+
+    const scoreEl = document.getElementById("score-text");
+    const waveEl = document.getElementById("wave-text");
+    const fillEl = document.getElementById("difficulty-fill");
+
+    if (scoreEl) scoreEl.textContent = score;
+    if (waveEl) waveEl.textContent = "WAVE " + wave;
+
+    const difficultyPercent = Math.min((score / 500) * 100, 100);
+    if (fillEl) fillEl.style.width = difficultyPercent + "%";
+  } catch (error) {
+    console.error("Update error:", error);
   }
 }
 
 function spawnAsteroid() {
-  const x = Phaser.Math.Between(60, this.sys.canvas.width - 60);
-  const y = 20;
+  try {
+    if (!gameScene || isGameOver || !gameScene.sys) return;
 
-  const ast = asteroidsGroup.create(x, y, "asteroid");
-  const fallSpeed = baseSpeed + speedIncrement + wave * 15;
-  ast.body.setVelocityY(fallSpeed);
-  ast.body.setCircle(18);
-  ast.setScale(0);
-  ast.setRotation(Phaser.Math.FloatBetween(0, Math.PI * 2));
-  
-  this.tweens.add({
-    targets: ast,
-    scale: 1,
-    duration: 400,
-    ease: 'Elastic.easeOut'
-  });
-  
-  this.tweens.add({
-    targets: ast,
-    rotation: ast.rotation + Math.PI * 2,
-    duration: 3000,
-    repeat: -1
-  });
+    const x = Phaser.Math.Between(60, gameScene.sys.canvas.width - 60);
+    const y = -20;
+
+    const ast = asteroidsGroup.create(x, y, "asteroid");
+    if (!ast) return;
+
+    const fallSpeed = baseSpeed + speedIncrement + wave * 15;
+    ast.body.setVelocityY(fallSpeed);
+    ast.setCircle(18, 2, 2); // PROPER HITBOX
+    ast.setScale(0.5);
+    ast.setRotation(Phaser.Math.FloatBetween(0, Math.PI * 2));
+
+    gameScene.tweens.add({
+      targets: ast,
+      scale: 1,
+      duration: 300,
+      ease: 'Back.easeOut'
+    });
+
+    gameScene.tweens.add({
+      targets: ast,
+      angle: 360,
+      duration: 2000,
+      repeat: -1
+    });
+  } catch (error) {
+    console.error("Spawn error:", error);
+  }
 }
 
 function spawnWave() {
-  asteroidsGroup.clear(true, true);
-  spawnTimer = 0;
-  const count = 3 + Math.floor(score / 80) + wave;
-  
-  for (let i = 0; i < count; i++) {
-    this.time.delayedCall(i * 350, () => {
-      spawnAsteroid.call(this);
-    });
+  try {
+    if (!gameScene) return;
+
+    asteroidsGroup.clear(true, true);
+    spawnTimer = 0;
+    const count = Math.min(3 + Math.floor(score / 80) + wave, 15);
+
+    for (let i = 0; i < count; i++) {
+      gameScene.time.delayedCall(i * 400, () => {
+        if (!isGameOver) spawnAsteroid.call(gameScene);
+      });
+    }
+  } catch (error) {
+    console.error("Wave error:", error);
   }
 }
 
 function shoot() {
-  if (isGameOver) return;
-  shotsFired++;
-  
-  const bullet = bulletsGroup.create(player.x, player.y - 20, "bullet");
-  bullet.setVelocityY(-700);
-  
-  trailParticles.createEmitter({
-    follow: bullet,
-    quantity: 2,
-    scale: { start: 0.4, end: 0 },
-    alpha: { start: 0.8, end: 0 },
-    lifespan: 200,
-    blendMode: 'ADD'
-  });
+  try {
+    if (isGameOver || !player || !player.active || !gameScene) return;
+    shotsFired++;
+
+    const bullet = bulletsGroup.create(player.x, player.y - 20, "bullet");
+    if (!bullet) return;
+
+    bullet.body.setVelocityY(-650);
+    bullet.setCircle(4, 0, 8); // PROPER BULLET HITBOX
+  } catch (error) {
+    console.error("Shoot error:", error);
+  }
 }
 
 function hitAsteroid(bullet, asteroid) {
-  bullet.destroy();
-  shotsHit++;
-  kills++;
+  try {
+    if (!bullet || !asteroid || !bullet.active || !asteroid.active) return;
 
-  particles.emitParticleAt(asteroid.x, asteroid.y, 30);
-  explosionParticles.emitParticleAt(asteroid.x, asteroid.y, 20);
+    // DESTROY BOTH IMMEDIATELY
+    const astX = asteroid.x;
+    const astY = asteroid.y;
 
-  score += 10;
+    bullet.destroy();
+    asteroid.destroy();
 
-  this.tweens.add({
-    targets: asteroid,
-    scale: 1.5,
-    alpha: 0,
-    duration: 200,
-    ease: 'Power2',
-    onComplete: () => asteroid.destroy()
-  });
+    shotsHit++;
+    kills++;
+    score += 10;
+
+    // EXPLOSION EFFECT
+    const emitter1 = particles.createEmitter({
+      x: astX,
+      y: astY,
+      speed: { min: 100, max: 250 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 1.2, end: 0 },
+      lifespan: 500,
+      quantity: 25,
+      blendMode: 'ADD',
+      tint: 0x64c8ff
+    });
+
+    const emitter2 = explosionParticles.createEmitter({
+      x: astX,
+      y: astY,
+      speed: { min: 80, max: 200 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 1, end: 0 },
+      lifespan: 400,
+      quantity: 20,
+      tint: 0xff8c42
+    });
+
+    gameScene.time.delayedCall(600, () => {
+      emitter1.stop();
+      emitter2.stop();
+    });
+  } catch (error) {
+    console.error("Hit error:", error);
+  }
 }
 
-function hitPlayer(player, asteroid) {
-  if (isInvulnerable) return;
+function hitPlayer(playerObj, asteroid) {
+  try {
+    if (isInvulnerable || !asteroid || !asteroid.active) return;
 
-  health--;
-  asteroid.destroy();
+    health--;
+    asteroid.destroy();
 
-  const hearts = document.querySelectorAll(".heart");
-  hearts[health].classList.add("lost");
+    const hearts = document.querySelectorAll(".heart");
+    if (hearts[health]) hearts[health].classList.add("lost");
 
-  isInvulnerable = true;
-  let flashCount = 0;
-  const flashInterval = setInterval(() => {
-    player.alpha = player.alpha === 1 ? 0.3 : 1;
-    flashCount++;
-    if (flashCount >= 10) {
-      clearInterval(flashInterval);
-      player.alpha = 1;
-      isInvulnerable = false;
+    isInvulnerable = true;
+    let flashCount = 0;
+    const flashInterval = setInterval(() => {
+      if (player && player.active) {
+        player.alpha = player.alpha === 1 ? 0.3 : 1;
+      }
+      flashCount++;
+      if (flashCount >= 10) {
+        clearInterval(flashInterval);
+        if (player && player.active) player.alpha = 1;
+        isInvulnerable = false;
+      }
+    }, 80);
+
+    const emitter = explosionParticles.createEmitter({
+      x: playerObj.x,
+      y: playerObj.y,
+      speed: { min: 100, max: 250 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 1.2, end: 0 },
+      lifespan: 500,
+      quantity: 35,
+      tint: 0xff6b9d
+    });
+
+    gameScene.time.delayedCall(600, () => emitter.stop());
+
+    if (health <= 0) {
+      endGame.call(gameScene);
     }
-  }, 80);
-
-  explosionParticles.emitParticleAt(player.x, player.y, 40);
-
-  if (health <= 0) {
-    endGame.call(this);
+  } catch (error) {
+    console.error("Hit player error:", error);
   }
 }
 
 function nextWave() {
-  wave++;
-  spawnWave.call(this);
+  try {
+    wave++;
+    spawnWave.call(gameScene);
+  } catch (error) {
+    console.error("Next wave error:", error);
+  }
 }
 
 function endGame() {
-  isGameOver = true;
-  player.setTint(0xff6b9d);
-  
-  const accuracy = shotsFired > 0 ? Math.round((shotsHit / shotsFired) * 100) : 0;
-  
-  document.getElementById("modal-score").textContent = score;
-  document.getElementById("modal-wave").textContent = wave;
-  document.getElementById("modal-kills").textContent = kills;
-  document.getElementById("modal-accuracy").textContent = accuracy + "%";
-  document.getElementById("game-over-modal").classList.add("active");
+  try {
+    isGameOver = true;
+    if (player && player.active) player.setTint(0xff6b9d);
+
+    const accuracy = shotsFired > 0 ? Math.round((shotsHit / shotsFired) * 100) : 0;
+
+    const modalScore = document.getElementById("modal-score");
+    const modalWave = document.getElementById("modal-wave");
+    const modalKills = document.getElementById("modal-kills");
+    const modalAccuracy = document.getElementById("modal-accuracy");
+    const modal = document.getElementById("game-over-modal");
+
+    if (modalScore) modalScore.textContent = score;
+    if (modalWave) modalWave.textContent = wave;
+    if (modalKills) modalKills.textContent = kills;
+    if (modalAccuracy) modalAccuracy.textContent = accuracy + "%";
+    if (modal) modal.classList.add("active");
+  } catch (error) {
+    console.error("End game error:", error);
+  }
 }
 </script>
 
