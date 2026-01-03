@@ -293,15 +293,20 @@ let health = 3;
 let wave = 1;
 let isGameOver = false;
 let spawnTimer = 0;
-let spawnRate = 3000;
+let spawnRate = 2000;
 let bulletsGroup;
 let asteroidsGroup;
 let isInvulnerable = false;
 
+// DIFFICULTY SCALING BASED ON SCORE
+let baseSpeed = 100;
+let speedIncrement = 0;
+let asteroidSizeMultiplier = 1;
+
 function preload() {
   const g = this.add.graphics();
 
-  // Player ship (sleek triangle with glow)
+  // Player ship
   g.fillStyle(0x64c8ff);
   g.beginPath();
   g.moveTo(20, 0);
@@ -314,7 +319,7 @@ function preload() {
   g.generateTexture("player", 40, 36);
   g.clear();
 
-  // Asteroid with premium look
+  // Asteroid
   g.fillStyle(0xff8c42);
   g.fillCircle(18, 18, 16);
   g.lineStyle(3, 0xffaa55);
@@ -326,7 +331,7 @@ function preload() {
   g.generateTexture("asteroid", 36, 36);
   g.clear();
 
-  // Bullet with glow
+  // Bullet
   g.fillStyle(0x64c8ff);
   g.fillRoundedRect(0, 0, 6, 16, 3);
   g.lineStyle(1, 0xffffff, 0.8);
@@ -336,20 +341,16 @@ function preload() {
 }
 
 function create() {
-  // Player
   player = this.physics.add.sprite(400, 340, "player");
   player.setCollideWorldBounds(true);
   player.setImmovable(true);
 
-  // Groups
   bulletsGroup = this.physics.add.group();
   asteroidsGroup = this.physics.add.group();
   
-  // Particles for bullet hits
   particles = this.add.particles(0x64c8ff);
   explosionParticles = this.add.particles(0xff8c42);
 
-  // Ground visual
   this.add.rectangle(400, 390, 800, 20, 0x1a4d4d, 0.3).setOrigin(0.5);
 
   // Input
@@ -360,52 +361,51 @@ function create() {
   });
 
   this.input.keyboard.on("keydown-LEFT", () => {
-    if (!isGameOver) player.x = Phaser.Math.Clamp(player.x - 20, 40, 760);
+    if (!isGameOver) player.x = Phaser.Math.Clamp(player.x - 25, 40, 760);
   });
   this.input.keyboard.on("keydown-RIGHT", () => {
-    if (!isGameOver) player.x = Phaser.Math.Clamp(player.x + 20, 40, 760);
+    if (!isGameOver) player.x = Phaser.Math.Clamp(player.x + 25, 40, 760);
   });
 
-  // Shooting
   this.input.on("pointerdown", shoot, this);
   this.input.keyboard.on("keydown-SPACE", shoot, this);
 
-  // Collisions
   this.physics.add.overlap(bulletsGroup, asteroidsGroup, hitAsteroid, null, this);
   this.physics.add.overlap(player, asteroidsGroup, hitPlayer, null, this);
 
-  // Spawn first wave
   spawnWave.call(this);
 }
 
 function update(time, delta) {
   if (isGameOver) return;
 
-  // Spawn asteroids
+  // PROGRESSIVE DIFFICULTY: Speed increases every 50 points
+  speedIncrement = Math.floor(score / 50) * 20;
+  
+  // PROGRESSIVE DIFFICULTY: Spawn rate gets faster
+  spawnRate = Math.max(2000 - Math.floor(score / 30) * 100, 800);
+  
+  // PROGRESSIVE DIFFICULTY: More asteroids appear
+  const asteroidsPerWave = 3 + Math.floor(score / 100);
+
   spawnTimer += delta;
   if (spawnTimer > spawnRate) {
     spawnTimer = 0;
     spawnAsteroid.call(this);
   }
 
-  spawnRate = Math.max(3000 - wave * 100, 1500);
-
-  // Recycle bullets
   bulletsGroup.children.iterate(bullet => {
     if (bullet && bullet.y < -20) bullet.destroy();
   });
 
-  // Recycle asteroids at bottom
   asteroidsGroup.children.iterate(asteroid => {
     if (asteroid && asteroid.y > 410) asteroid.destroy();
   });
 
-  // Check wave clear
   if (asteroidsGroup.countActive(true) === 0 && spawnTimer > 500) {
     nextWave.call(this);
   }
 
-  // Update HUD
   document.getElementById("score-text").textContent = score;
   document.getElementById("wave-text").textContent = "WAVE " + wave;
 }
@@ -415,11 +415,14 @@ function spawnAsteroid() {
   const y = 30;
 
   const ast = asteroidsGroup.create(x, y, "asteroid");
-  ast.body.setVelocityY(80 + wave * 8);
+  
+  // PROGRESSIVE DIFFICULTY: Asteroids fall faster based on score
+  const fallSpeed = baseSpeed + speedIncrement + wave * 15;
+  ast.body.setVelocityY(fallSpeed);
+  
   ast.body.setCircle(16);
   ast.setScale(0);
   
-  // Smooth spawn animation
   this.tweens.add({
     targets: ast,
     scale: 1,
@@ -431,9 +434,12 @@ function spawnAsteroid() {
 function spawnWave() {
   asteroidsGroup.clear(true, true);
   spawnTimer = 0;
-  const count = 2 + Math.floor(wave / 2);
+  
+  // PROGRESSIVE DIFFICULTY: More asteroids per wave
+  const count = 3 + Math.floor(score / 80) + wave;
+  
   for (let i = 0; i < count; i++) {
-    this.time.delayedCall(i * 600, () => {
+    this.time.delayedCall(i * 400, () => {
       spawnAsteroid.call(this);
     });
   }
@@ -448,13 +454,11 @@ function shoot() {
 function hitAsteroid(bullet, asteroid) {
   bullet.destroy();
 
-  // Particle burst
   particles.emitParticleAt(asteroid.x, asteroid.y, 25);
   explosionParticles.emitParticleAt(asteroid.x, asteroid.y, 15);
 
   score += 10;
 
-  // Scale out animation
   this.tweens.add({
     targets: asteroid,
     scale: 0,
@@ -470,11 +474,9 @@ function hitPlayer(player, asteroid) {
   health--;
   asteroid.destroy();
 
-  // Update hearts UI
   const hearts = document.querySelectorAll(".heart");
   hearts[health].classList.add("lost");
 
-  // Invulnerability flash
   isInvulnerable = true;
   let flashCount = 0;
   const flashInterval = setInterval(() => {
@@ -487,7 +489,6 @@ function hitPlayer(player, asteroid) {
     }
   }, 100);
 
-  // Explosion particles
   explosionParticles.emitParticleAt(player.x, player.y, 30);
 
   if (health <= 0) {
