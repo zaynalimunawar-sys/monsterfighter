@@ -12,13 +12,13 @@
       font-family: monospace;
       overflow: hidden;
       user-select: none;
+      -webkit-user-select: none;
     }
     canvas {
       display: block;
       margin: 0 auto;
       image-rendering: pixelated;
-      image-rendering: -moz-crisp-edges;
-      image-rendering: crisp-edges;
+      touch-action: none;
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.85.0/dist/phaser.js"></script>
@@ -38,8 +38,8 @@ const config = {
   physics: {
     default: "arcade",
     arcade: {
-      gravity: { y: 1600 },
-      debug: false  /* FIXED: debug OFF */
+      gravity: { y: 1400 },
+      debug: false
     }
   },
   scene: { preload, create, update }
@@ -47,120 +47,195 @@ const config = {
 
 let game = new Phaser.Game(config);
 
-let dino, obstacles, ground;
+let dino, ground, obstacles;
 let score = 0;
+let highScore = 0;
 let gameSpeed = 6;
-let jumpVelocity = -450;
+let isGameOver = false;
+let scoreText, hiText;
+let spawnTimer = 0;
+let spawnInterval = 1500;
 
 function preload() {
-  // Dino run frames (pixel art style)
   const g = this.add.graphics();
   
-  // Frame 1: legs back
-  g.fillStyle(0x000000);
-  g.fillRect(2, 24, 12, 12);  // body
-  g.fillRect(14, 26, 8, 10); // tail
-  g.fillRect(2, 12, 6, 8);   // head
-  g.fillRect(0, 20, 4, 8);   // leg1
-  g.fillRect(12, 20, 4, 8);  // leg2 back
-  g.generateTexture("dino1", 24, 40);
+  // Dino sprite (simple T-Rex style)
+  g.fillStyle(0x535353);
+  g.fillRect(4, 0, 16, 20);    // body
+  g.fillRect(0, 8, 8, 8);      // head
+  g.fillRect(6, 20, 4, 12);    // leg1
+  g.fillRect(14, 20, 4, 12);   // leg2
+  g.fillRect(18, 4, 8, 8);     // tail
+  g.generateTexture("dino", 28, 32);
   g.clear();
 
-  // Frame 2: legs forward
-  g.fillRect(2, 24, 12, 12);
-  g.fillRect(14, 26, 8, 10);
-  g.fillRect(2, 12, 6, 8);
-  g.fillRect(4, 20, 4, 8);   // leg1 forward
-  g.fillRect(16, 20, 4, 8);  // leg2
-  g.generateTexture("dino2", 24, 40);
+  // Small cactus
+  g.fillStyle(0x2d8659);
+  g.fillRect(4, 8, 8, 24);
+  g.fillRect(0, 16, 4, 12);
+  g.fillRect(12, 16, 4, 12);
+  g.generateTexture("cactus1", 16, 32);
   g.clear();
 
-  // Cactus
-  g.fillStyle(0x228B22);
-  g.fillRect(0, 16, 8, 24);
-  g.fillRect(4, 8, 12, 16);
-  g.fillRect(12, 16, 8, 16);
-  g.lineStyle(1, 0x006400);
-  g.strokeRect(0, 16, 8, 24);
-  g.strokeRect(4, 8, 12, 16);
-  g.strokeRect(12, 16, 8, 16);
-  g.generateTexture("cactus", 24, 48);
+  // Tall cactus
+  g.fillRect(4, 0, 8, 32);
+  g.fillRect(0, 8, 4, 16);
+  g.fillRect(12, 8, 4, 16);
+  g.generateTexture("cactus2", 16, 32);
+  g.clear();
+
+  // Bird
+  g.fillStyle(0x535353);
+  g.fillRect(4, 4, 12, 8);
+  g.fillRect(0, 6, 8, 4);
+  g.fillRect(12, 6, 8, 4);
+  g.generateTexture("bird", 20, 16);
   g.destroy();
 }
 
 function create() {
-  // Ground
-  ground = this.add.rectangle(0, 370, 2000, 30, 0xcccccc).setOrigin(0);
+  // Ground line
+  ground = this.add.rectangle(0, 350, 1600, 2, 0x535353).setOrigin(0);
   this.physics.add.existing(ground, true);
 
   // Dino
-  dino = this.physics.add.sprite(100, 340, "dino1");
-  dino.setBounce(0.05);
-  dino.setCollideWorldBounds(false);
-  dino.body.setSize(20, 24);
-  dino.currentFrame = 0;
+  dino = this.physics.add.sprite(80, 318, "dino");
+  dino.setCollideWorldBounds(true);
+  dino.body.setSize(24, 28);
+  dino.body.setOffset(2, 4);
 
-  // Obstacles
+  // Obstacles group
   obstacles = this.physics.add.group();
 
-  // Input: tap anywhere or SPACE
-  this.input.on("pointerdown", jump);
-  this.input.keyboard.on("keydown-SPACE", jump);
-
-  // Collisions
+  // Collision
   this.physics.add.collider(dino, ground);
-  this.physics.add.collider(dino, obstacles, gameOver);
+  this.physics.add.overlap(dino, obstacles, hitObstacle, null, this);
+
+  // Score display
+  scoreText = this.add.text(650, 20, "00000", {
+    fontFamily: "monospace",
+    fontSize: "20px",
+    fill: "#535353"
+  });
+
+  hiText = this.add.text(550, 20, "HI 00000", {
+    fontFamily: "monospace",
+    fontSize: "20px",
+    fill: "#535353"
+  });
+
+  // Input: tap/click anywhere or SPACE
+  this.input.on("pointerdown", jump, this);
+  this.input.keyboard.on("keydown-SPACE", jump, this);
+
+  // Initial spawn
+  spawnObstacle.call(this);
 }
 
 function update(time, delta) {
-  // Dino animation (run cycle)
-  dino.currentFrame = (Math.floor(time / 150) % 2);
-  dino.setTexture("dino" + (dino.currentFrame + 1));
+  if (isGameOver) return;
 
-  // Auto-run forward
-  dino.body.velocity.x = 120 + score * 0.5;
+  // Increment score
+  score += 1;
+  scoreText.setText(String(score).padStart(5, "0"));
 
-  // Spawn obstacles
-  if (time % (2000 - score * 10) < delta) {
+  // Speed increase over time
+  gameSpeed = 6 + score * 0.001;
+
+  // Move obstacles
+  obstacles.children.iterate(obs => {
+    if (!obs || !obs.active) return;
+    obs.x -= gameSpeed;
+    
+    // Recycle off-screen
+    if (obs.x < -50) {
+      obs.destroy();
+    }
+  });
+
+  // Spawn new obstacles with timer
+  spawnTimer += delta;
+  if (spawnTimer > spawnInterval) {
+    spawnTimer = 0;
+    spawnInterval = Phaser.Math.Between(1200, 2400) - score * 0.5;
+    spawnInterval = Math.max(spawnInterval, 600);
     spawnObstacle.call(this);
   }
 
-  // Increase difficulty
-  score = Math.floor(dino.x / 10);
-  gameSpeed = Math.min(12 + score * 0.02, 25);
-
-  // Recycle old obstacles
-  obstacles.children.iterate(obs => {
-    if (obs.x < -50) obs.destroy();
-  });
-
-  // Score text
-  if (!this.scoreText) {
-    this.scoreText = this.add.text(16, 16, "0", {
-      fontFamily: "monospace",
-      fontSize: "24px",
-      fill: "#666"
-    }).setStroke("#fff", 2);
+  // Keep dino from falling through ground
+  if (dino.y > 318 && dino.body.velocity.y > 0) {
+    dino.y = 318;
+    dino.setVelocityY(0);
   }
-  this.scoreText.setText(score.toString());
 }
 
 function jump() {
-  if (dino.body.touching.down) {
-    dino.setVelocityY(jumpVelocity);
+  if (isGameOver) {
+    restartGame.call(this);
+    return;
+  }
+
+  // Only jump if on ground
+  if (dino.y >= 318) {
+    dino.setVelocityY(-600);
   }
 }
 
 function spawnObstacle() {
-  const obs = obstacles.create(850, 346, "cactus");
-  obs.body.velocity.x = -(200 + score * 3);
-  obs.body.setSize(16, 32);
+  const type = Phaser.Math.Between(1, 3);
+  let obs;
+
+  if (type === 1) {
+    // Small cactus on ground
+    obs = obstacles.create(850, 326, "cactus1");
+    obs.body.setSize(14, 28);
+  } else if (type === 2) {
+    // Tall cactus on ground
+    obs = obstacles.create(850, 318, "cactus2");
+    obs.body.setSize(14, 30);
+  } else {
+    // Flying bird (mid-height)
+    obs = obstacles.create(850, 270, "bird");
+    obs.body.setSize(18, 14);
+  }
+
+  obs.setImmovable(true);
+  obs.body.allowGravity = false;
 }
 
-function gameOver() {
-  // Simple restart
-  this.scene.restart();
+function hitObstacle(dino, obstacle) {
+  if (isGameOver) return;
+
+  isGameOver = true;
+  dino.setTint(0xff0000);
+  
+  // Update high score
+  if (score > highScore) {
+    highScore = score;
+    hiText.setText("HI " + String(highScore).padStart(5, "0"));
+  }
+
+  // Show game over message
+  this.add.text(300, 150, "GAME OVER", {
+    fontFamily: "monospace",
+    fontSize: "32px",
+    fill: "#535353"
+  });
+
+  this.add.text(280, 200, "Tap to Restart", {
+    fontFamily: "monospace",
+    fontSize: "20px",
+    fill: "#535353"
+  });
+}
+
+function restartGame() {
+  isGameOver = false;
   score = 0;
+  gameSpeed = 6;
+  spawnTimer = 0;
+  spawnInterval = 1500;
+  this.scene.restart();
 }
 </script>
 
