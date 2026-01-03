@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Dino Dash</title>
+  <title>Tap Blast</title>
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
   <style>
     :root {
@@ -23,11 +23,10 @@
     canvas {
       display: block;
       margin: 0 auto;
-      image-rendering: pixelated;
       touch-action: none;
     }
 
-    .hud-top {
+    .hud {
       position: fixed;
       top: var(--safe-area-top);
       left: 0;
@@ -43,62 +42,40 @@
       z-index: 100;
     }
 
-    .score-group {
-      display: flex;
-      gap: 30px;
-    }
-
-    .score-item {
-      text-align: center;
-    }
-
-    .score-label {
-      font-size: 12px;
-      font-weight: 600;
-      color: rgba(255, 255, 255, 0.7);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 4px;
-    }
-
-    .score-value {
-      font-size: 32px;
+    .score-display {
+      font-size: 28px;
       font-weight: 700;
       color: #ffffff;
-      font-family: "Courier New", monospace;
+      font-family: monospace;
       letter-spacing: 2px;
     }
 
-    .game-status {
-      background: rgba(255, 255, 255, 0.15);
-      padding: 12px 24px;
+    .combo-display {
+      background: rgba(255, 193, 7, 0.2);
+      border: 2px solid rgba(255, 193, 7, 0.6);
+      color: #ffc107;
+      padding: 8px 16px;
       border-radius: 50px;
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      color: #ffffff;
-      font-weight: 600;
-      font-size: 14px;
-      letter-spacing: 0.5px;
+      font-weight: 700;
+      font-size: 16px;
     }
 
-    .game-status.alive {
-      background: rgba(76, 175, 80, 0.2);
-      border-color: rgba(76, 175, 80, 0.4);
-      color: #4CAF50;
-    }
-
-    .game-status.dead {
-      background: rgba(244, 67, 54, 0.2);
-      border-color: rgba(244, 67, 54, 0.4);
-      color: #F44336;
+    .timer-bar {
+      position: fixed;
+      bottom: var(--safe-area-bottom);
+      left: 0;
+      height: 6px;
+      background: linear-gradient(90deg, #4caf50, #ffc107, #ff6b6b);
+      z-index: 50;
+      transition: width 0.1s linear;
     }
 
     .modal {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.5);
+      background: rgba(0, 0, 0, 0.6);
       backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
       z-index: 200;
       align-items: center;
       justify-content: center;
@@ -112,7 +89,6 @@
       background: rgba(255, 255, 255, 0.95);
       backdrop-filter: blur(20px);
       border-radius: 24px;
-      border: 1px solid rgba(255, 255, 255, 0.3);
       padding: 40px;
       text-align: center;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
@@ -129,15 +105,9 @@
       font-size: 48px;
       font-weight: 700;
       color: #667eea;
-      font-family: "Courier New", monospace;
-      margin: 0 0 10px 0;
+      font-family: monospace;
+      margin: 0 0 30px 0;
       letter-spacing: 2px;
-    }
-
-    .modal-hi {
-      font-size: 18px;
-      color: #999;
-      margin-bottom: 30px;
     }
 
     .modal-button {
@@ -149,61 +119,36 @@
       font-size: 18px;
       font-weight: 600;
       cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-      margin-top: 20px;
+      transition: transform 0.2s;
     }
 
     .modal-button:active {
       transform: scale(0.95);
-      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
     }
 
     @media (max-width: 600px) {
-      .hud-top {
-        height: 70px;
-        padding: 0 16px;
-      }
-      .score-group {
-        gap: 20px;
-      }
-      .score-value {
-        font-size: 24px;
-      }
-      .modal-content {
-        padding: 30px;
-        margin: 20px;
-      }
-      .modal-title {
-        font-size: 28px;
-      }
-      .modal-score {
-        font-size: 36px;
-      }
+      .hud { height: 70px; padding: 0 16px; }
+      .score-display { font-size: 24px; }
+      .modal-content { padding: 30px; margin: 20px; }
+      .modal-title { font-size: 28px; }
+      .modal-score { font-size: 36px; }
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.85.0/dist/phaser.js"></script>
 </head>
 <body>
 
-<div class="hud-top">
-  <div class="score-group">
-    <div class="score-item">
-      <div class="score-label">Score</div>
-      <div class="score-value" id="score-text">00000</div>
-    </div>
-    <div class="score-item">
-      <div class="score-label">High Score</div>
-      <div class="score-value" id="hi-text">00000</div>
-    </div>
-  </div>
-  <div class="game-status alive" id="status-text">READY</div>
+<div class="hud">
+  <div class="score-display" id="score-text">0</div>
+  <div class="combo-display" id="combo-text">COMBO: 0</div>
 </div>
+
+<div class="timer-bar" id="timer-bar"></div>
 
 <div class="modal" id="game-over-modal">
   <div class="modal-content">
     <h1 class="modal-title">GAME OVER</h1>
-    <div class="modal-score" id="modal-score">00000</div>
-    <div class="modal-hi" id="modal-hi">Best: 00000</div>
+    <div class="modal-score" id="modal-score">0</div>
     <button class="modal-button" onclick="location.reload()">Play Again</button>
   </div>
 </div>
@@ -220,196 +165,160 @@ const config = {
   },
   physics: {
     default: "arcade",
-    arcade: {
-      gravity: { y: 1400 },
-      debug: false
-    }
+    arcade: { debug: false }
   },
   scene: { preload, create, update }
 };
 
 let game = new Phaser.Game(config);
 
-let dino, ground, obstacles;
 let score = 0;
-let highScore = localStorage.getItem("dinoDashHighScore") || 0;
-let gameSpeed = 6;
+let combo = 0;
+let timeLeft = 30000; // 30 seconds
+let gameStartTime = 0;
 let isGameOver = false;
-let spawnTimer = 0;
-let spawnInterval = 1500;
-let dinoAnimFrame = 0;
+let orbs;
+let particles;
+
+const orbColors = [0xff6b6b, 0x4ecdc4, 0xffd700, 0x667eea, 0x2ecc71];
 
 function preload() {
   const g = this.add.graphics();
-  
-  // Dino walk frame 1 (leg back)
-  g.fillStyle(0x3a8346);
-  g.fillRect(4, 0, 16, 20);    // body
-  g.fillRect(0, 8, 8, 8);      // head
-  g.fillRect(6, 20, 4, 12);    // leg1 back
-  g.fillRect(14, 20, 4, 12);   // leg2 forward
-  g.fillRect(18, 4, 8, 8);     // tail
-  g.generateTexture("dino1", 28, 32);
-  g.clear();
 
-  // Dino walk frame 2 (legs swap)
-  g.fillStyle(0x3a8346);
-  g.fillRect(4, 0, 16, 20);
-  g.fillRect(0, 8, 8, 8);
-  g.fillRect(6, 20, 4, 12);    // leg1 forward
-  g.fillRect(14, 20, 4, 12);   // leg2 back
-  g.fillRect(18, 4, 8, 8);
-  g.generateTexture("dino2", 28, 32);
-  g.clear();
+  // Create orb textures (circles)
+  orbColors.forEach((color, idx) => {
+    g.fillStyle(color);
+    g.fillCircle(16, 16, 14);
+    g.fillStyle(0xffffff);
+    g.fillCircle(16, 16, 10);
+    g.generateTexture("orb" + idx, 32, 32);
+    g.clear();
+  });
 
-  // Dino jump (mid-air)
-  g.fillStyle(0x3a8346);
-  g.fillRect(4, 0, 16, 20);
-  g.fillRect(0, 8, 8, 8);
-  g.fillRect(6, 22, 4, 8);     // legs up
-  g.fillRect(14, 22, 4, 8);
-  g.fillRect(18, 4, 8, 8);
-  g.generateTexture("dino-jump", 28, 32);
-  g.clear();
-
-  // Small cactus
-  g.fillStyle(0x2d8659);
-  g.fillRect(4, 8, 8, 24);
-  g.fillRect(0, 16, 4, 12);
-  g.fillRect(12, 16, 4, 12);
-  g.generateTexture("cactus1", 16, 32);
-  g.clear();
-
-  // Tall cactus
-  g.fillRect(4, 0, 8, 32);
-  g.fillRect(0, 8, 4, 16);
-  g.fillRect(12, 8, 4, 16);
-  g.generateTexture("cactus2", 16, 32);
-  g.clear();
-
-  // Bird
-  g.fillStyle(0x535353);
-  g.fillRect(4, 4, 12, 8);
-  g.fillRect(0, 6, 8, 4);
-  g.fillRect(12, 6, 8, 4);
-  g.generateTexture("bird", 20, 16);
   g.destroy();
 }
 
 function create() {
-  // Ground
-  ground = this.add.rectangle(0, 350, 1600, 2, 0x535353).setOrigin(0);
-  this.physics.add.existing(ground, true);
+  gameStartTime = Date.now();
+  
+  // Orb group
+  orbs = this.physics.add.group();
+  particles = this.add.particles(0xffffff);
 
-  // Dino
-  dino = this.physics.add.sprite(80, 318, "dino1");
-  dino.setCollideWorldBounds(true);
-  dino.body.setSize(24, 28);
-  dino.body.setOffset(2, 4);
-
-  // Obstacles
-  obstacles = this.physics.add.group();
-
-  // Collisions
-  this.physics.add.collider(dino, ground);
-  this.physics.add.overlap(dino, obstacles, hitObstacle, null, this);
-
-  // Update high score display
-  document.getElementById("hi-text").textContent = String(highScore).padStart(5, "0");
+  // Spawn first orbs
+  for (let i = 0; i < 5; i++) {
+    spawnOrb.call(this);
+  }
 
   // Input
-  this.input.on("pointerdown", jump, this);
-  this.input.keyboard.on("keydown-SPACE", jump, this);
+  this.input.on("pointerdown", (pointer) => {
+    handleTap.call(this, pointer);
+  });
 
-  // Initial spawn
-  spawnObstacle.call(this);
+  // Update HUD
+  this.time.addEvent({
+    delay: 100,
+    callback: updateHUD,
+    loop: true
+  });
 }
 
 function update(time, delta) {
   if (isGameOver) return;
 
-  // Score
-  score += 1;
-  document.getElementById("score-text").textContent = String(score).padStart(5, "0");
+  // Update time
+  timeLeft = 30000 - (Date.now() - gameStartTime);
 
-  // Speed increase
-  gameSpeed = 6 + score * 0.0015;
+  if (timeLeft <= 0) {
+    endGame.call(this);
+    return;
+  }
 
-  // Move obstacles
-  obstacles.children.iterate(obs => {
-    if (!obs || !obs.active) return;
-    obs.x -= gameSpeed;
-    if (obs.x < -50) obs.destroy();
+  // Update timer bar
+  const timerBar = document.getElementById("timer-bar");
+  timerBar.style.width = ((timeLeft / 30000) * 100) + "%";
+
+  // Move orbs with slight bounce
+  orbs.children.iterate(orb => {
+    if (!orb || !orb.active) return;
+    orb.y += Math.sin(time / 300 + orb.id) * 0.5;
+    orb.rotation += 0.02;
+
+    // Recycle if off screen
+    if (orb.y > 500) {
+      orb.destroy();
+      spawnOrb.call(this);
+    }
   });
 
-  // Spawn obstacles
-  spawnTimer += delta;
-  if (spawnTimer > spawnInterval) {
-    spawnTimer = 0;
-    spawnInterval = Phaser.Math.Between(1200, 2400) - score * 0.8;
-    spawnInterval = Math.max(spawnInterval, 600);
-    spawnObstacle.call(this);
-  }
-
-  // Dino animation (walk cycle when on ground)
-  if (dino.y >= 318) {
-    dinoAnimFrame = (Math.floor(time / 100) % 2);
-    dino.setTexture("dino" + (dinoAnimFrame + 1));
-  } else {
-    // Jump pose when in air
-    dino.setTexture("dino-jump");
-  }
-
-  // Ground constraint
-  if (dino.y > 318 && dino.body.velocity.y > 0) {
-    dino.y = 318;
-    dino.setVelocityY(0);
+  // Spawn new orbs randomly
+  if (Math.random() < 0.01) {
+    spawnOrb.call(this);
   }
 }
 
-function jump() {
-  if (isGameOver) return;
-  if (dino.y >= 318) {
-    dino.setVelocityY(-600);
+function spawnOrb() {
+  const x = Phaser.Math.Between(50, 750);
+  const y = -40;
+  const colorIdx = Phaser.Math.Between(0, 4);
+
+  const orb = orbs.create(x, y, "orb" + colorIdx);
+  orb.id = colorIdx;
+  orb.setScale(1);
+  orb.setInteractive();
+  orb.on("pointerdown", () => {
+    if (isGameOver) return;
+    tapOrb.call(this, orb);
+  });
+
+  orb.body.setVelocityY(Phaser.Math.Between(100, 200));
+}
+
+function tapOrb(orb) {
+  if (!orb || !orb.active) return;
+
+  // Score boost based on combo
+  const points = 10 + combo * 5;
+  score += points;
+  combo++;
+
+  // Particle burst
+  particles.emitParticleAt(orb.x, orb.y, 10);
+
+  // Scale animation
+  this.tweens.add({
+    targets: orb,
+    scale: 1.3,
+    duration: 100
+  });
+
+  // Pop sound effect (visual feedback)
+  orb.setTint(0xffffff);
+  orb.destroy();
+
+  // Spawn 2 new orbs to keep density
+  spawnOrb.call(this);
+  spawnOrb.call(this);
+}
+
+function handleTap(pointer) {
+  // Check if tapped on an orb (handled by pointerdown event on orb)
+  // Reset combo if miss
+  if (combo > 0) {
+    setTimeout(() => {
+      if (combo > 0) combo = 0; // Reset if no tap for 1 second
+    }, 1000);
   }
 }
 
-function spawnObstacle() {
-  const type = Phaser.Math.Between(1, 3);
-  let obs;
-
-  if (type === 1) {
-    obs = obstacles.create(850, 326, "cactus1");
-    obs.body.setSize(14, 28);
-  } else if (type === 2) {
-    obs = obstacles.create(850, 318, "cactus2");
-    obs.body.setSize(14, 30);
-  } else {
-    obs = obstacles.create(850, 270, "bird");
-    obs.body.setSize(18, 14);
-  }
-
-  obs.setImmovable(true);
-  obs.body.allowGravity = false;
+function updateHUD() {
+  document.getElementById("score-text").textContent = score;
+  document.getElementById("combo-text").textContent = "COMBO: " + combo;
 }
 
-function hitObstacle(dino, obstacle) {
-  if (isGameOver) return;
-
+function endGame() {
   isGameOver = true;
-  dino.setTint(0xff6b6b);
-  document.getElementById("status-text").textContent = "DEAD";
-  document.getElementById("status-text").className = "game-status dead";
-
-  // Update high score
-  if (score > highScore) {
-    highScore = score;
-    localStorage.setItem("dinoDashHighScore", highScore);
-  }
-
-  // Show game over modal
-  document.getElementById("modal-score").textContent = String(score).padStart(5, "0");
-  document.getElementById("modal-hi").textContent = "Best: " + String(highScore).padStart(5, "0");
+  document.getElementById("modal-score").textContent = score;
   document.getElementById("game-over-modal").classList.add("active");
 }
 </script>
