@@ -3,34 +3,217 @@
 <head>
   <meta charset="UTF-8" />
   <title>Dino Dash</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
   <style>
+    :root {
+      --safe-area-top: env(safe-area-inset-top);
+      --safe-area-bottom: env(safe-area-inset-bottom);
+    }
+
     body {
       margin: 0;
       padding: 0;
-      background: #f7f7f7;
-      font-family: monospace;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       overflow: hidden;
       user-select: none;
       -webkit-user-select: none;
     }
+
     canvas {
       display: block;
       margin: 0 auto;
       image-rendering: pixelated;
       touch-action: none;
     }
+
+    .hud-top {
+      position: fixed;
+      top: var(--safe-area-top);
+      left: 0;
+      right: 0;
+      height: 80px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 20px;
+      z-index: 100;
+    }
+
+    .score-group {
+      display: flex;
+      gap: 30px;
+    }
+
+    .score-item {
+      text-align: center;
+    }
+
+    .score-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.7);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .score-value {
+      font-size: 32px;
+      font-weight: 700;
+      color: #ffffff;
+      font-family: "Courier New", monospace;
+      letter-spacing: 2px;
+    }
+
+    .game-status {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 12px 24px;
+      border-radius: 50px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+    }
+
+    .game-status.alive {
+      background: rgba(76, 175, 80, 0.2);
+      border-color: rgba(76, 175, 80, 0.4);
+      color: #4CAF50;
+    }
+
+    .game-status.dead {
+      background: rgba(244, 67, 54, 0.2);
+      border-color: rgba(244, 67, 54, 0.4);
+      color: #F44336;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 40px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .modal-title {
+      font-size: 36px;
+      font-weight: 700;
+      color: #333;
+      margin: 0 0 20px 0;
+    }
+
+    .modal-score {
+      font-size: 48px;
+      font-weight: 700;
+      color: #667eea;
+      font-family: "Courier New", monospace;
+      margin: 0 0 10px 0;
+      letter-spacing: 2px;
+    }
+
+    .modal-hi {
+      font-size: 18px;
+      color: #999;
+      margin-bottom: 30px;
+    }
+
+    .modal-button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 14px 40px;
+      border-radius: 50px;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-top: 20px;
+    }
+
+    .modal-button:active {
+      transform: scale(0.95);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    @media (max-width: 600px) {
+      .hud-top {
+        height: 70px;
+        padding: 0 16px;
+      }
+      .score-group {
+        gap: 20px;
+      }
+      .score-value {
+        font-size: 24px;
+      }
+      .modal-content {
+        padding: 30px;
+        margin: 20px;
+      }
+      .modal-title {
+        font-size: 28px;
+      }
+      .modal-score {
+        font-size: 36px;
+      }
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.85.0/dist/phaser.js"></script>
 </head>
 <body>
+
+<div class="hud-top">
+  <div class="score-group">
+    <div class="score-item">
+      <div class="score-label">Score</div>
+      <div class="score-value" id="score-text">00000</div>
+    </div>
+    <div class="score-item">
+      <div class="score-label">High Score</div>
+      <div class="score-value" id="hi-text">00000</div>
+    </div>
+  </div>
+  <div class="game-status alive" id="status-text">READY</div>
+</div>
+
+<div class="modal" id="game-over-modal">
+  <div class="modal-content">
+    <h1 class="modal-title">GAME OVER</h1>
+    <div class="modal-score" id="modal-score">00000</div>
+    <div class="modal-hi" id="modal-hi">Best: 00000</div>
+    <button class="modal-button" onclick="location.reload()">Play Again</button>
+  </div>
+</div>
 
 <script>
 const config = {
   type: Phaser.AUTO,
   width: 800,
   height: 400,
-  backgroundColor: "#f7f7f7",
+  backgroundColor: "#e8e8e8",
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
@@ -49,24 +232,44 @@ let game = new Phaser.Game(config);
 
 let dino, ground, obstacles;
 let score = 0;
-let highScore = 0;
+let highScore = localStorage.getItem("dinoDashHighScore") || 0;
 let gameSpeed = 6;
 let isGameOver = false;
-let scoreText, hiText;
 let spawnTimer = 0;
 let spawnInterval = 1500;
+let dinoAnimFrame = 0;
 
 function preload() {
   const g = this.add.graphics();
   
-  // Dino sprite (simple T-Rex style)
-  g.fillStyle(0x535353);
+  // Dino walk frame 1 (leg back)
+  g.fillStyle(0x3a8346);
   g.fillRect(4, 0, 16, 20);    // body
   g.fillRect(0, 8, 8, 8);      // head
-  g.fillRect(6, 20, 4, 12);    // leg1
-  g.fillRect(14, 20, 4, 12);   // leg2
+  g.fillRect(6, 20, 4, 12);    // leg1 back
+  g.fillRect(14, 20, 4, 12);   // leg2 forward
   g.fillRect(18, 4, 8, 8);     // tail
-  g.generateTexture("dino", 28, 32);
+  g.generateTexture("dino1", 28, 32);
+  g.clear();
+
+  // Dino walk frame 2 (legs swap)
+  g.fillStyle(0x3a8346);
+  g.fillRect(4, 0, 16, 20);
+  g.fillRect(0, 8, 8, 8);
+  g.fillRect(6, 20, 4, 12);    // leg1 forward
+  g.fillRect(14, 20, 4, 12);   // leg2 back
+  g.fillRect(18, 4, 8, 8);
+  g.generateTexture("dino2", 28, 32);
+  g.clear();
+
+  // Dino jump (mid-air)
+  g.fillStyle(0x3a8346);
+  g.fillRect(4, 0, 16, 20);
+  g.fillRect(0, 8, 8, 8);
+  g.fillRect(6, 22, 4, 8);     // legs up
+  g.fillRect(14, 22, 4, 8);
+  g.fillRect(18, 4, 8, 8);
+  g.generateTexture("dino-jump", 28, 32);
   g.clear();
 
   // Small cactus
@@ -94,37 +297,27 @@ function preload() {
 }
 
 function create() {
-  // Ground line
+  // Ground
   ground = this.add.rectangle(0, 350, 1600, 2, 0x535353).setOrigin(0);
   this.physics.add.existing(ground, true);
 
   // Dino
-  dino = this.physics.add.sprite(80, 318, "dino");
+  dino = this.physics.add.sprite(80, 318, "dino1");
   dino.setCollideWorldBounds(true);
   dino.body.setSize(24, 28);
   dino.body.setOffset(2, 4);
 
-  // Obstacles group
+  // Obstacles
   obstacles = this.physics.add.group();
 
-  // Collision
+  // Collisions
   this.physics.add.collider(dino, ground);
   this.physics.add.overlap(dino, obstacles, hitObstacle, null, this);
 
-  // Score display
-  scoreText = this.add.text(650, 20, "00000", {
-    fontFamily: "monospace",
-    fontSize: "20px",
-    fill: "#535353"
-  });
+  // Update high score display
+  document.getElementById("hi-text").textContent = String(highScore).padStart(5, "0");
 
-  hiText = this.add.text(550, 20, "HI 00000", {
-    fontFamily: "monospace",
-    fontSize: "20px",
-    fill: "#535353"
-  });
-
-  // Input: tap/click anywhere or SPACE
+  // Input
   this.input.on("pointerdown", jump, this);
   this.input.keyboard.on("keydown-SPACE", jump, this);
 
@@ -135,34 +328,39 @@ function create() {
 function update(time, delta) {
   if (isGameOver) return;
 
-  // Increment score
+  // Score
   score += 1;
-  scoreText.setText(String(score).padStart(5, "0"));
+  document.getElementById("score-text").textContent = String(score).padStart(5, "0");
 
-  // Speed increase over time
-  gameSpeed = 6 + score * 0.001;
+  // Speed increase
+  gameSpeed = 6 + score * 0.0015;
 
   // Move obstacles
   obstacles.children.iterate(obs => {
     if (!obs || !obs.active) return;
     obs.x -= gameSpeed;
-    
-    // Recycle off-screen
-    if (obs.x < -50) {
-      obs.destroy();
-    }
+    if (obs.x < -50) obs.destroy();
   });
 
-  // Spawn new obstacles with timer
+  // Spawn obstacles
   spawnTimer += delta;
   if (spawnTimer > spawnInterval) {
     spawnTimer = 0;
-    spawnInterval = Phaser.Math.Between(1200, 2400) - score * 0.5;
+    spawnInterval = Phaser.Math.Between(1200, 2400) - score * 0.8;
     spawnInterval = Math.max(spawnInterval, 600);
     spawnObstacle.call(this);
   }
 
-  // Keep dino from falling through ground
+  // Dino animation (walk cycle when on ground)
+  if (dino.y >= 318) {
+    dinoAnimFrame = (Math.floor(time / 100) % 2);
+    dino.setTexture("dino" + (dinoAnimFrame + 1));
+  } else {
+    // Jump pose when in air
+    dino.setTexture("dino-jump");
+  }
+
+  // Ground constraint
   if (dino.y > 318 && dino.body.velocity.y > 0) {
     dino.y = 318;
     dino.setVelocityY(0);
@@ -170,12 +368,7 @@ function update(time, delta) {
 }
 
 function jump() {
-  if (isGameOver) {
-    restartGame.call(this);
-    return;
-  }
-
-  // Only jump if on ground
+  if (isGameOver) return;
   if (dino.y >= 318) {
     dino.setVelocityY(-600);
   }
@@ -186,15 +379,12 @@ function spawnObstacle() {
   let obs;
 
   if (type === 1) {
-    // Small cactus on ground
     obs = obstacles.create(850, 326, "cactus1");
     obs.body.setSize(14, 28);
   } else if (type === 2) {
-    // Tall cactus on ground
     obs = obstacles.create(850, 318, "cactus2");
     obs.body.setSize(14, 30);
   } else {
-    // Flying bird (mid-height)
     obs = obstacles.create(850, 270, "bird");
     obs.body.setSize(18, 14);
   }
@@ -207,35 +397,20 @@ function hitObstacle(dino, obstacle) {
   if (isGameOver) return;
 
   isGameOver = true;
-  dino.setTint(0xff0000);
-  
+  dino.setTint(0xff6b6b);
+  document.getElementById("status-text").textContent = "DEAD";
+  document.getElementById("status-text").className = "game-status dead";
+
   // Update high score
   if (score > highScore) {
     highScore = score;
-    hiText.setText("HI " + String(highScore).padStart(5, "0"));
+    localStorage.setItem("dinoDashHighScore", highScore);
   }
 
-  // Show game over message
-  this.add.text(300, 150, "GAME OVER", {
-    fontFamily: "monospace",
-    fontSize: "32px",
-    fill: "#535353"
-  });
-
-  this.add.text(280, 200, "Tap to Restart", {
-    fontFamily: "monospace",
-    fontSize: "20px",
-    fill: "#535353"
-  });
-}
-
-function restartGame() {
-  isGameOver = false;
-  score = 0;
-  gameSpeed = 6;
-  spawnTimer = 0;
-  spawnInterval = 1500;
-  this.scene.restart();
+  // Show game over modal
+  document.getElementById("modal-score").textContent = String(score).padStart(5, "0");
+  document.getElementById("modal-hi").textContent = "Best: " + String(highScore).padStart(5, "0");
+  document.getElementById("game-over-modal").classList.add("active");
 }
 </script>
 
