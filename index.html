@@ -1,10 +1,170 @@
+<!DOCTYPE html>
 <html>
-
+<head>
+  <meta charset="UTF-8" />
+  <title>Blue vs Red Squares</title>
+  <style>
+    body { margin: 0; background: #111; }
+    canvas { display: block; margin: 0 auto; }
+  </style>
+  <!-- Phaser 3 from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.85.0/dist/phaser.js"></script>
+</head>
 <body>
 
-<h1> ZAYN </h1>
-  
-</body>
+<script>
+// ================== CONFIG ==================
+const config = {
+  type: Phaser.AUTO,
+  width: 800,
+  height: 600,
+  backgroundColor: "#222222",
+  physics: {
+    default: "arcade",
+    arcade: { debug: false }
+  },
+  scene: { preload, create, update }
+};
 
-  
+let game = new Phaser.Game(config);
+
+let player, cursors, bullets, enemies, lastFired = 0;
+let level = 1, killsThisLevel = 0, killsToNextLevel = 5;
+let levelText;
+
+// ================== SCENE FUNCS ==================
+function preload() {
+  // no external assets
+}
+
+function create() {
+  // --- create simple textures ---
+  const g = this.add.graphics();
+
+  // player: blue square
+  g.fillStyle(0x0000ff, 1);
+  g.fillRect(0, 0, 32, 32);
+  g.generateTexture("playerBlue", 32, 32);
+  g.clear();
+
+  // enemy: red square
+  g.fillStyle(0xff0000, 1);
+  g.fillRect(0, 0, 28, 28);
+  g.generateTexture("enemyRed", 28, 28);
+  g.destroy();
+
+  // --- player ---
+  player = this.physics.add.sprite(400, 300, "playerBlue");
+  player.setCollideWorldBounds(true);
+  player.speed = 200;
+
+  // --- bullets & enemies ---
+  bullets = this.physics.add.group({ classType: Phaser.Physics.Arcade.Image, maxSize: 100 });
+  enemies = this.physics.add.group();
+
+  // --- input ---
+  cursors = this.input.keyboard.createCursorKeys();
+  this.input.mouse.capture();
+
+  // --- UI ---
+  levelText = this.add.text(10, 10, "Level: 1", { font: "20px Arial", fill: "#ffffff" });
+  this.add.text(10, 35, "Move: Arrows | Shoot: Mouse", { font: "16px Arial", fill: "#ffffff" });
+
+  // --- collisions ---
+  this.physics.add.overlap(bullets, enemies, (bullet, enemy) => {
+    bullet.destroy();
+    enemy.health -= 1;
+    if (enemy.health <= 0) {
+      enemy.destroy();
+      killsThisLevel++;
+      if (killsThisLevel >= killsToNextLevel) levelUp.call(this);
+    }
+  });
+
+  this.physics.add.overlap(player, enemies, () => {
+    // restart on hit
+    this.scene.restart();
+    level = 1;
+    killsThisLevel = 0;
+    killsToNextLevel = 5;
+  });
+
+  spawnWave.call(this);
+}
+
+function update(time) {
+  handlePlayerMovement();
+  handleShooting(this, time);
+
+  enemies.children.iterate(enemy => {
+    if (!enemy || !enemy.active) return;
+    this.physics.moveToObject(enemy, player, enemy.speed);
+  });
+}
+
+// ================== HELPERS ==================
+function handlePlayerMovement() {
+  player.setVelocity(0);
+
+  if (cursors.left.isDown) player.setVelocityX(-player.speed);
+  else if (cursors.right.isDown) player.setVelocityX(player.speed);
+
+  if (cursors.up.isDown) player.setVelocityY(-player.speed);
+  else if (cursors.down.isDown) player.setVelocityY(player.speed);
+}
+
+function handleShooting(scene, time) {
+  const pointer = scene.input.activePointer;
+  if (!pointer.isDown || time <= lastFired + 200) return;
+
+  lastFired = time;
+  const bullet = bullets.get(player.x, player.y);
+  if (!bullet) return;
+
+  bullet.setActive(true);
+  bullet.setVisible(true);
+  bullet.setTint(0xffffff);
+  bullet.body.setCircle(4);
+
+  const angle = Phaser.Math.Angle.Between(player.x, player.y, pointer.worldX, pointer.worldY);
+  const speed = 400;
+  bullet.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
+
+  scene.time.delayedCall(1000, () => {
+    if (bullet && bullet.active) bullet.destroy();
+  });
+}
+
+function spawnWave() {
+  enemies.clear(true, true);
+
+  const count = 3 + level * 2;
+  const baseSpeed = 60 + level * 15;
+  const baseHealth = 1 + Math.floor(level / 2);
+
+  for (let i = 0; i < count; i++) {
+    const side = Phaser.Math.Between(0, 3);
+    let x, y;
+    if (side === 0) { x = Phaser.Math.Between(0, 800); y = -20; }
+    else if (side === 1) { x = 820; y = Phaser.Math.Between(0, 600); }
+    else if (side === 2) { x = Phaser.Math.Between(0, 800); y = 620; }
+    else { x = -20; y = Phaser.Math.Between(0, 600); }
+
+    const enemy = enemies.create(x, y, "enemyRed");
+    enemy.speed = baseSpeed;
+    enemy.health = baseHealth;
+  }
+}
+
+function levelUp() {
+  level++;
+  killsThisLevel = 0;
+  killsToNextLevel += 3;
+  levelText.setText("Level: " + level);
+  player.speed += 15;
+  spawnWave.call(this);
+}
+</script>
+
+</body>
 </html>
