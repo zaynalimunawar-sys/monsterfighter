@@ -2,22 +2,138 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Topdown Sword Swarm</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+  <title>Glass Sword Swarm</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
   <style>
-    body { margin: 0; background: #111; }
-    canvas { display: block; margin: 0 auto; touch-action: none; }
+    :root {
+      --safe-area-top: env(safe-area-inset-top);
+      --safe-area-right: env(safe-area-inset-right);
+      --safe-area-bottom: env(safe-area-inset-bottom);
+      --safe-area-left: env(safe-area-inset-left);
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: radial-gradient(circle at top, #1e293b, #020617);
+      font-family: -apple-system, system-ui, sans-serif;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      margin: 0 auto;
+      touch-action: none;
+    }
+
+    /* Glassmorphic overlay container pinned to screen edges (safe area aware) [web:177][web:180] */
+    .hud-layer {
+      position: fixed;
+      inset: var(--safe-area-top) var(--safe-area-right) var(--safe-area-bottom) var(--safe-area-left);
+      pointer-events: none;
+    }
+
+    /* Glass panel for joystick and buttons [web:176][web:179][web:185] */
+    .glass-panel {
+      position: absolute;
+      background: rgba(15, 23, 42, 0.35);
+      border-radius: 22px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(22px) saturate(140%);
+      -webkit-backdrop-filter: blur(22px) saturate(140%);
+      pointer-events: auto;
+    }
+
+    /* Bottom-left panel for joystick */
+    .panel-left {
+      left: 14px;
+      bottom: 14px;
+      width: 150px;
+      height: 150px;
+    }
+
+    /* Bottom-right panel for attack */
+    .panel-right {
+      right: 14px;
+      bottom: 14px;
+      width: 130px;
+      height: 130px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Glass button inside panel */
+    .glass-button {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.1));
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(26px);
+      -webkit-backdrop-filter: blur(26px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(15, 23, 42, 0.9);
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    .glass-button:active {
+      transform: translateY(2px) scale(0.97);
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.7);
+    }
+
+    /* Joystick canvas placed inside glass panel */
+    #joy-layer {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 150px;
+      height: 150px;
+      pointer-events: none; /* actual touch handled by Phaser underneath */
+    }
+
+    /* On desktop, shrink panels a bit */
+    @media (min-width: 900px) {
+      .panel-left { width: 140px; height: 140px; }
+      .panel-right { width: 120px; height: 120px; }
+      .glass-button { width: 80px; height: 80px; }
+    }
   </style>
+
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.85.0/dist/phaser.js"></script>
 </head>
 <body>
 
+<div class="hud-layer">
+  <div class="glass-panel panel-left">
+    <canvas id="joy-layer"></canvas>
+  </div>
+  <div class="glass-panel panel-right">
+    <div id="attack-btn" class="glass-button">SWING</div>
+  </div>
+</div>
+
 <script>
+// Responsive, iPhone-friendly scaling [web:171][web:174][web:180]
 const config = {
   type: Phaser.AUTO,
   width: 800,
   height: 600,
-  backgroundColor: "#202020",
+  backgroundColor: "#020617",
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH
+  },
   physics: {
     default: "arcade",
     arcade: { debug: false }
@@ -29,14 +145,12 @@ let game = new Phaser.Game(config);
 
 let player, monsters, swordHitbox;
 let score = 0, scoreText;
-
 let cursors;
-let joyBase, joyThumb;
+
 let joyPointer = null;
 let joyRadius = 60;
 let moveVector = { x: 0, y: 0 };
 
-let attackBtn;
 let attacking = false;
 let canAttack = true;
 
@@ -45,58 +159,47 @@ function preload() {}
 function create() {
   const g = this.add.graphics();
 
-  // player: blue square
-  g.fillStyle(0x3399ff, 1);
-  g.fillRect(0, 0, 32, 32);
-  g.generateTexture("playerBlue", 32, 32);
+  // player / monster / sword textures
+  g.fillStyle(0x38bdf8, 1);
+  g.fillRoundedRect(0, 0, 30, 30, 8);
+  g.generateTexture("playerBlue", 30, 30);
   g.clear();
 
-  // monster: red square
-  g.fillStyle(0xff3333, 1);
-  g.fillRect(0, 0, 26, 26);
+  g.fillStyle(0xf97373, 1);
+  g.fillRoundedRect(0, 0, 26, 26, 8);
   g.generateTexture("monsterRed", 26, 26);
   g.clear();
 
-  // sword hitbox: yellow rectangle
-  g.fillStyle(0xffff00, 0.6);
-  g.fillRect(0, 0, 32, 16);
-  g.generateTexture("swordBox", 32, 16);
-  g.clear();
-
-  // joystick base + thumb [web:145][web:148]
-  g.fillStyle(0xffffff, 0.15);
-  g.fillCircle(70, 530, 40);
-  g.generateTexture("joyBase", 140, 140);
-  g.clear();
-
-  g.fillStyle(0xffffff, 0.4);
-  g.fillCircle(0, 0, 25);
-  g.generateTexture("joyThumb", 50, 50);
+  g.fillStyle(0xfacc15, 0.7);
+  g.fillRoundedRect(0, 0, 36, 16, 6);
+  g.generateTexture("swordBox", 36, 16);
   g.destroy();
 
-  // player
+  // Player
   player = this.physics.add.sprite(400, 300, "playerBlue");
   player.setCollideWorldBounds(true);
-  player.speed = 200;
+  player.speed = 220;
   player.facing = "down";
 
-  // sword hitbox (invisible unless attacking)
+  // Sword hitbox
   swordHitbox = this.physics.add.image(player.x, player.y, "swordBox");
   swordHitbox.setVisible(false);
   swordHitbox.body.enable = false;
 
-  // monsters
+  // Monster group
   monsters = this.physics.add.group();
   spawnMonsters.call(this, 6);
 
-  // keyboard for desktop
+  // Keyboard
   cursors = this.input.keyboard.createCursorKeys();
 
-  // score
-  scoreText = this.add.text(10, 10, "Score: 0", { font: "20px Arial", fill: "#ffffff" });
-  this.add.text(10, 35, "Move: Joystick or Arrows | Attack: Button", { font: "14px Arial", fill: "#ffffff" });
+  // Score
+  scoreText = this.add.text(16, 16, "Score: 0", {
+    font: "20px -apple-system, system-ui, sans-serif",
+    fill: "#e5e7eb"
+  });
 
-  // sword vs monsters
+  // Collisions
   this.physics.add.overlap(swordHitbox, monsters, (s, m) => {
     if (!attacking) return;
     m.destroy();
@@ -107,44 +210,30 @@ function create() {
     }
   });
 
-  // monsters vs player
   this.physics.add.overlap(player, monsters, () => {
     score = 0;
     this.scene.restart();
   });
 
-  // === VIRTUAL JOYSTICK === [web:145][web:148]
-  joyBase = this.add.circle(80, 520, 40, 0xffffff, 0.1).setScrollFactor(0);
-  joyThumb = this.add.circle(80, 520, 20, 0xffffff, 0.5).setScrollFactor(0);
-  joyBase.setInteractive();
+  // Virtual joystick touch handling (under glass panel) [web:145][web:148][web:152]
+  const joyPanelRect = document.querySelector(".panel-left").getBoundingClientRect();
+  const canvasOffsetX = joyPanelRect.left;
+  const canvasOffsetY = joyPanelRect.top;
 
-  joyBase.on("pointerdown", (pointer) => {
-    joyPointer = pointer.id;
-    joyThumb.x = pointer.x;
-    joyThumb.y = pointer.y;
-    joyBase.x = pointer.x;
-    joyBase.y = pointer.y;
+  this.input.on("pointerdown", (pointer) => {
+    // Limit joystick to left-bottom quadrant
+    if (pointer.x + canvasOffsetX < joyPanelRect.right &&
+        pointer.x + canvasOffsetX > joyPanelRect.left &&
+        pointer.y + canvasOffsetY < joyPanelRect.bottom &&
+        pointer.y + canvasOffsetY > joyPanelRect.top) {
+      joyPointer = pointer.id;
+      updateJoy(pointer, joyPanelRect);
+    }
   });
 
   this.input.on("pointermove", (pointer) => {
     if (joyPointer === pointer.id) {
-      const dx = pointer.x - joyBase.x;
-      const dy = pointer.y - joyBase.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const max = joyRadius;
-
-      let nx = dx;
-      let ny = dy;
-      if (dist > max && dist !== 0) {
-        nx = (dx / dist) * max;
-        ny = (dy / dist) * max;
-      }
-
-      joyThumb.x = joyBase.x + nx;
-      joyThumb.y = joyBase.y + ny;
-
-      moveVector.x = nx / max;
-      moveVector.y = ny / max;
+      updateJoy(pointer, joyPanelRect);
     }
   });
 
@@ -153,134 +242,49 @@ function create() {
       joyPointer = null;
       moveVector.x = 0;
       moveVector.y = 0;
-      joyBase.x = 80;
-      joyBase.y = 520;
-      joyThumb.x = 80;
-      joyThumb.y = 520;
+      drawJoyNeutral();
     }
   });
 
-  // === ATTACK BUTTON ===
-  attackBtn = this.add.rectangle(720, 520, 80, 80, 0xffcc00, 0.4)
-    .setScrollFactor(0)
-    .setInteractive();
-  this.add.text(702, 505, "SWING", { font: "18px Arial", fill: "#000000" }).setScrollFactor(0);
-
-  attackBtn.on("pointerdown", () => {
+  // Attack: HTML button plus keyboard SPACE [web:145][web:150]
+  const attackBtnEl = document.getElementById("attack-btn");
+  attackBtnEl.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    tryAttack.call(this);
+  }, { passive: false });
+  attackBtnEl.addEventListener("mousedown", (e) => {
+    e.preventDefault();
     tryAttack.call(this);
   });
 
-  // also allow SPACE on keyboard for attack
   this.input.keyboard.on("keydown-SPACE", () => {
     tryAttack.call(this);
   });
+
+  setupJoyCanvas();
 }
 
 function update(time, delta) {
-  handleMovement(delta);
+  handleMovement();
   updateSwordHitbox();
   moveMonsters();
 }
 
-// movement from joystick + keyboard [web:57][web:145]
-function handleMovement(delta) {
+function handleMovement() {
   player.setVelocity(0);
 
-  // keyboard
+  // Keyboard movement
   if (cursors.left && cursors.left.isDown) player.setVelocityX(-player.speed);
   if (cursors.right && cursors.right.isDown) player.setVelocityX(player.speed);
   if (cursors.up && cursors.up.isDown) player.setVelocityY(-player.speed);
   if (cursors.down && cursors.down.isDown) player.setVelocityY(player.speed);
 
-  // joystick
+  // Joystick movement overrides if active
   if (moveVector.x !== 0 || moveVector.y !== 0) {
     player.setVelocity(moveVector.x * player.speed, moveVector.y * player.speed);
   }
 
-  // update facing based on last movement
   if (player.body.velocity.lengthSq() > 0) {
     const vx = player.body.velocity.x;
     const vy = player.body.velocity.y;
-    if (Math.abs(vx) > Math.abs(vy)) {
-      player.facing = vx > 0 ? "right" : "left";
-    } else {
-      player.facing = vy > 0 ? "down" : "up";
-    }
-  }
-}
-
-function tryAttack() {
-  if (!canAttack) return;
-  canAttack = false;
-  attacking = true;
-
-  swordHitbox.setVisible(true);
-  swordHitbox.body.enable = true;
-
-  // end attack after a short time [web:162][web:166]
-  this.time.delayedCall(200, () => {
-    attacking = false;
-    swordHitbox.setVisible(false);
-    swordHitbox.body.enable = false;
-  });
-
-  // cooldown
-  this.time.delayedCall(300, () => {
-    canAttack = true;
-  });
-}
-
-function updateSwordHitbox() {
-  swordHitbox.x = player.x;
-  swordHitbox.y = player.y;
-
-  // position in front of player based on facing
-  const offset = 24;
-  if (player.facing === "right") {
-    swordHitbox.angle = 0;
-    swordHitbox.x = player.x + offset;
-    swordHitbox.y = player.y;
-  } else if (player.facing === "left") {
-    swordHitbox.angle = 180;
-    swordHitbox.x = player.x - offset;
-    swordHitbox.y = player.y;
-  } else if (player.facing === "up") {
-    swordHitbox.angle = -90;
-    swordHitbox.x = player.x;
-    swordHitbox.y = player.y - offset;
-  } else {
-    swordHitbox.angle = 90;
-    swordHitbox.x = player.x;
-    swordHitbox.y = player.y + offset;
-  }
-}
-
-function spawnMonsters(count) {
-  monsters.clear(true, true);
-  for (let i = 0; i < count; i++) {
-    const edge = Phaser.Math.Between(0, 3);
-    let x, y;
-    if (edge === 0) { x = Phaser.Math.Between(0, 800); y = -30; }
-    else if (edge === 1) { x = 830; y = Phaser.Math.Between(0, 600); }
-    else if (edge === 2) { x = Phaser.Math.Between(0, 800); y = 630; }
-    else { x = -30; y = Phaser.Math.Between(0, 600); }
-
-    const m = monsters.create(x, y, "monsterRed");
-    m.speed = 60 + score * 3; // faster as score goes up [web:61]
-  }
-}
-
-// monsters swarm toward player [web:61][web:76]
-function moveMonsters() {
-  monsters.children.iterate(m => {
-    if (!m || !m.active) return;
-    const angle = Phaser.Math.Angle.Between(m.x, m.y, player.x, player.y);
-    const vx = Math.cos(angle) * m.speed;
-    const vy = Math.sin(angle) * m.speed;
-    m.setVelocity(vx, vy);
-  });
-}
-</script>
-
-</body>
-</html>
+    if (Math
