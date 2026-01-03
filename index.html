@@ -3,107 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <title>Dino Dash</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
   <style>
-    :root {
-      --safe-area-top: env(safe-area-inset-top);
-      --safe-area-right: env(safe-area-inset-right);
-      --safe-area-bottom: env(safe-area-inset-bottom);
-      --safe-area-left: env(safe-area-inset-left);
-    }
-
     body {
       margin: 0;
       padding: 0;
-      background: linear-gradient(135deg, #ff9a56, #ff6b6b);
-      font-family: -apple-system, system-ui, sans-serif;
+      background: #f7f7f7;
+      font-family: monospace;
       overflow: hidden;
+      user-select: none;
     }
-
     canvas {
       display: block;
       margin: 0 auto;
-      touch-action: none;
-    }
-
-    .hud-layer {
-      position: fixed;
-      inset: var(--safe-area-top) var(--safe-area-right) var(--safe-area-bottom) var(--safe-area-left);
-      pointer-events: none;
-    }
-
-    .glass-panel {
-      position: absolute;
-      background: rgba(255, 255, 255, 0.12);
-      border-radius: 20px;
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      pointer-events: auto;
-    }
-
-    .panel-top {
-      top: 14px;
-      left: 14px;
-      right: 14px;
-      height: 80px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0 20px;
-    }
-
-    .score-panel {
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 16px;
-      padding: 12px 20px;
-      font-size: 22px;
-      font-weight: 700;
-      color: #fff;
-      letter-spacing: 0.05em;
-    }
-
-    .lives-panel {
-      display: flex;
-      gap: 8px;
-    }
-
-    .heart {
-      width: 32px;
-      height: 32px;
-      background: #ff4757;
-      border-radius: 50%;
-      box-shadow: 0 4px 12px rgba(255, 71, 87, 0.4);
-    }
-
-    @media (min-width: 900px) {
-      .panel-top { height: 70px; }
-      .score-panel { font-size: 20px; padding: 10px 18px; }
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
     }
   </style>
-
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.85.0/dist/phaser.js"></script>
 </head>
 <body>
-
-<div class="hud-layer">
-  <div class="glass-panel panel-top">
-    <div class="score-panel" id="score-text">Distance: 0</div>
-    <div class="lives-panel">
-      <div class="heart"></div>
-      <div class="heart"></div>
-      <div class="heart"></div>
-    </div>
-  </div>
-</div>
 
 <script>
 const config = {
   type: Phaser.AUTO,
   width: 800,
-  height: 600,
-  backgroundColor: "#87CEEB",
+  height: 400,
+  backgroundColor: "#f7f7f7",
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
@@ -111,8 +38,8 @@ const config = {
   physics: {
     default: "arcade",
     arcade: {
-      gravity: { y: 1200 },
-      debug: false
+      gravity: { y: 1600 },
+      debug: false  /* FIXED: debug OFF */
     }
   },
   scene: { preload, create, update }
@@ -120,165 +47,122 @@ const config = {
 
 let game = new Phaser.Game(config);
 
-let dino, obstacles, coins;
-let score = 0, lives = 3;
-let gameSpeed = 200;
-let jumpTimer = 0;
-let isJumping = false;
-let cameraSpeed = 0;
-let bg1, bg2, fg1, fg2; // parallax layers [web:217][web:219]
+let dino, obstacles, ground;
+let score = 0;
+let gameSpeed = 6;
+let jumpVelocity = -450;
 
-function preload() {}
+function preload() {
+  // Dino run frames (pixel art style)
+  const g = this.add.graphics();
+  
+  // Frame 1: legs back
+  g.fillStyle(0x000000);
+  g.fillRect(2, 24, 12, 12);  // body
+  g.fillRect(14, 26, 8, 10); // tail
+  g.fillRect(2, 12, 6, 8);   // head
+  g.fillRect(0, 20, 4, 8);   // leg1
+  g.fillRect(12, 20, 4, 8);  // leg2 back
+  g.generateTexture("dino1", 24, 40);
+  g.clear();
+
+  // Frame 2: legs forward
+  g.fillRect(2, 24, 12, 12);
+  g.fillRect(14, 26, 8, 10);
+  g.fillRect(2, 12, 6, 8);
+  g.fillRect(4, 20, 4, 8);   // leg1 forward
+  g.fillRect(16, 20, 4, 8);  // leg2
+  g.generateTexture("dino2", 24, 40);
+  g.clear();
+
+  // Cactus
+  g.fillStyle(0x228B22);
+  g.fillRect(0, 16, 8, 24);
+  g.fillRect(4, 8, 12, 16);
+  g.fillRect(12, 16, 8, 16);
+  g.lineStyle(1, 0x006400);
+  g.strokeRect(0, 16, 8, 24);
+  g.strokeRect(4, 8, 12, 16);
+  g.strokeRect(12, 16, 8, 16);
+  g.generateTexture("cactus", 24, 48);
+  g.destroy();
+}
 
 function create() {
-  const g = this.add.graphics();
-
-  // Dino sprite (simple rounded rect)
-  g.fillStyle(0x4ecdc4, 1);
-  g.fillRoundedRect(0, 0, 48, 36, 8);
-  g.fillStyle(0x44a08d, 1);
-  g.fillRoundedRect(8, 4, 32, 24, 6);
-  g.lineStyle(2, 0x2c5530);
-  g.strokeRoundedRect(8, 4, 32, 24, 6);
-  g.generateTexture("dino", 48, 36);
-  g.clear();
-
-  // Cactus obstacle
-  g.fillStyle(0x27ae60, 1);
-  g.fillRoundedRect(0, 0, 24, 48, 8);
-  g.fillStyle(0x229954, 1);
-  g.fillRoundedRect(6, 6, 12, 36, 4);
-  g.generateTexture("cactus", 24, 48);
-  g.clear();
-
-  // Coin
-  g.fillStyle(0xffd700, 1);
-  g.fillCircle(12, 12, 12);
-  g.lineStyle(2, 0xd4af37);
-  g.strokeCircle(12, 12, 12);
-  g.generateTexture("coin", 24, 24);
-  g.destroy();
+  // Ground
+  ground = this.add.rectangle(0, 370, 2000, 30, 0xcccccc).setOrigin(0);
+  this.physics.add.existing(ground, true);
 
   // Dino
-  dino = this.physics.add.sprite(150, 400, "dino");
-  dino.setBounce(0.1);
+  dino = this.physics.add.sprite(100, 340, "dino1");
+  dino.setBounce(0.05);
   dino.setCollideWorldBounds(false);
-  dino.body.setSize(32, 28);
+  dino.body.setSize(20, 24);
+  dino.currentFrame = 0;
 
-  // Groups
+  // Obstacles
   obstacles = this.physics.add.group();
-  coins = this.physics.add.group();
 
-  // Parallax backgrounds [web:217][web:219]
-  bg1 = this.add.tileSprite(0, 0, 800, 600, 0xe8f4f8).setOrigin(0).setScrollFactor(0);
-  bg2 = this.add.tileSprite(0, 0, 800, 600, 0x4682b4).setOrigin(0).setScrollFactor(0);
-  fg1 = this.add.tileSprite(0, 0, 800, 600, 0x90ee90).setOrigin(0).setScrollFactor(0);
-
-  // Ground collision
-  const platforms = this.physics.add.staticGroup();
-  platforms.create(400, 580, null).setSize(900, 40).setVisible(false);
-  this.physics.add.collider(dino, platforms);
-
-  // Collisions
-  this.physics.add.collider(dino, obstacles, hitObstacle);
-  this.physics.add.overlap(dino, coins, collectCoin);
-
-  // Input: tap anywhere, SPACE, or double-tap [web:212]
+  // Input: tap anywhere or SPACE
   this.input.on("pointerdown", jump);
   this.input.keyboard.on("keydown-SPACE", jump);
-  this.input.on("pointerdown", (pointer) => {
-    if (Date.now() - jumpTimer < 250) jump.call(this); // double-tap
-  });
 
-  updateUI();
+  // Collisions
+  this.physics.add.collider(dino, ground);
+  this.physics.add.collider(dino, obstacles, gameOver);
 }
 
 function update(time, delta) {
-  // Dino animations
-  if (dino.body.touching.down) {
-    isJumping = false;
-    dino.setVelocityY(0);
-  } else {
-    dino.setVelocityY(Math.max(dino.body.velocity.y, -800));
+  // Dino animation (run cycle)
+  dino.currentFrame = (Math.floor(time / 150) % 2);
+  dino.setTexture("dino" + (dino.currentFrame + 1));
+
+  // Auto-run forward
+  dino.body.velocity.x = 120 + score * 0.5;
+
+  // Spawn obstacles
+  if (time % (2000 - score * 10) < delta) {
+    spawnObstacle.call(this);
   }
 
-  // Generate endless obstacles and coins
-  if (score % 120 === 0) spawnObstacle.call(this);
-  if (score % 80 === 0) spawnCoin.call(this);
-
   // Increase difficulty
-  cameraSpeed = Math.min(300 + score * 0.5, 800);
-  gameSpeed = Math.min(250 + score * 0.3, 600);
+  score = Math.floor(dino.x / 10);
+  gameSpeed = Math.min(12 + score * 0.02, 25);
 
-  // Camera follows
-  this.cameras.main.scrollY = -(score * 2);
+  // Recycle old obstacles
+  obstacles.children.iterate(obs => {
+    if (obs.x < -50) obs.destroy();
+  });
 
-  // Parallax scroll [web:217][web:219]
-  bg1.tilePositionY = -(this.cameras.main.scrollY * 0.2);
-  bg2.tilePositionY = -(this.cameras.main.scrollY * 0.4);
-  fg1.tilePositionY = -(this.cameras.main.scrollY * 0.8);
-
-  score++;
-  updateUI();
-
-  // Recycle off-screen items
-  obstacles.children.iterate(recycleOffscreen);
-  coins.children.iterate(recycleOffscreen);
+  // Score text
+  if (!this.scoreText) {
+    this.scoreText = this.add.text(16, 16, "0", {
+      fontFamily: "monospace",
+      fontSize: "24px",
+      fill: "#666"
+    }).setStroke("#fff", 2);
+  }
+  this.scoreText.setText(score.toString());
 }
 
 function jump() {
-  if (isJumping || dino.body.touching.down === false) return;
-  isJumping = true;
-  jumpTimer = Date.now();
-  dino.setVelocityY(-650);
+  if (dino.body.touching.down) {
+    dino.setVelocityY(jumpVelocity);
+  }
 }
 
 function spawnObstacle() {
-  const x = 850 + Math.random() * 200;
-  const obs = obstacles.create(x, 520, "cactus");
-  obs.body.setSize(20, 40);
-  obs.body.velocity.x = -gameSpeed;
+  const obs = obstacles.create(850, 346, "cactus");
+  obs.body.velocity.x = -(200 + score * 3);
+  obs.body.setSize(16, 32);
 }
 
-function spawnCoin() {
-  const x = 850 + Math.random() * 300;
-  const y = 400 + Math.random() * 100;
-  const coin = coins.create(x, y, "coin");
-  coin.body.velocity.x = -gameSpeed;
-}
-
-function hitObstacle(dino, obs) {
-  obs.destroy();
-  lives--;
-  if (lives <= 0) {
-    this.scene.restart();
-    score = 0;
-    lives = 3;
-  }
-  updateUI();
-}
-
-function collectCoin(dino, coin) {
-  coin.destroy();
-  score += 10;
-}
-
-function recycleOffscreen(item) {
-  if (!item || !item.active) return;
-  if (item.x < -50) {
-    item.destroy();
-  }
-}
-
-function updateUI() {
-  document.getElementById("score-text").textContent = "Distance: " + Math.floor(score / 10);
-  const hearts = document.querySelectorAll(".heart");
-  hearts.forEach((heart, i) => {
-    heart.style.background = i < lives ? "#ff4757" : "#666";
-  });
+function gameOver() {
+  // Simple restart
+  this.scene.restart();
+  score = 0;
 }
 </script>
 
 </body>
 </html>
-
