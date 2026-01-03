@@ -163,7 +163,7 @@
       <div class="score-value" id="score-text">0</div>
     </div>
     <div class="score-item">
-      <div class="score-label">Health</div>
+      <div class="score-label">Lives</div>
       <div class="score-value" id="health-text">3</div>
     </div>
   </div>
@@ -192,7 +192,7 @@ const config = {
   physics: {
     default: "arcade",
     arcade: {
-      gravity: { y: 300 },
+      gravity: { y: 0 },
       debug: false
     }
   },
@@ -207,9 +207,10 @@ let health = 3;
 let wave = 1;
 let isGameOver = false;
 let spawnTimer = 0;
-let spawnRate = 2500;
+let spawnRate = 3000;
 let bulletsGroup;
 let asteroidsGroup;
+let groundLine;
 
 function preload() {
   const g = this.add.graphics();
@@ -225,7 +226,7 @@ function preload() {
   g.generateTexture("player", 32, 32);
   g.clear();
 
-  // Large asteroid (size 1)
+  // Asteroid - single size (no breaking)
   g.fillStyle(0xff8c42);
   g.fillCircle(16, 16, 14);
   g.lineStyle(2, 0xffaa55);
@@ -233,25 +234,7 @@ function preload() {
   g.fillStyle(0xffaa55);
   g.fillCircle(10, 10, 3);
   g.fillCircle(22, 14, 3);
-  g.generateTexture("asteroid1", 32, 32);
-  g.clear();
-
-  // Medium asteroid (size 2)
-  g.fillStyle(0xff8c42);
-  g.fillCircle(12, 12, 10);
-  g.lineStyle(2, 0xffaa55);
-  g.strokeCircle(12, 12, 10);
-  g.fillStyle(0xffaa55);
-  g.fillCircle(8, 8, 2);
-  g.generateTexture("asteroid2", 24, 24);
-  g.clear();
-
-  // Small asteroid (size 3 - final)
-  g.fillStyle(0xff8c42);
-  g.fillCircle(8, 8, 6);
-  g.lineStyle(1, 0xffaa55);
-  g.strokeCircle(8, 8, 6);
-  g.generateTexture("asteroid3", 16, 16);
+  g.generateTexture("asteroid", 32, 32);
   g.clear();
 
   // Bullet
@@ -262,6 +245,10 @@ function preload() {
 }
 
 function create() {
+  // Ground line (invisible collision)
+  groundLine = this.physics.add.staticGroup();
+  groundLine.create(400, 385, null).setSize(800, 30).setVisible(false);
+
   // Player
   player = this.physics.add.sprite(400, 350, "player");
   player.setCollideWorldBounds(true);
@@ -271,6 +258,9 @@ function create() {
   bulletsGroup = this.physics.add.group();
   asteroidsGroup = this.physics.add.group();
   particles = this.add.particles(0x64c8ff);
+
+  // Ground visual (optional)
+  this.add.rectangle(400, 390, 800, 20, 0x1a4d4d).setOrigin(0.5);
 
   // Input: move ship with touch/mouse
   this.input.on("pointermove", (pointer) => {
@@ -291,7 +281,7 @@ function create() {
 
   // Collisions
   this.physics.add.overlap(bulletsGroup, asteroidsGroup, hitAsteroid, null, this);
-  this.physics.add.overlap(player, asteroidsGroup, hitPlayer, null, this);
+  this.physics.add.overlap(asteroidsGroup, groundLine, hitGround, null, this);
 
   // Spawn first wave
   spawnWave.call(this);
@@ -307,19 +297,12 @@ function update(time, delta) {
     spawnAsteroid.call(this);
   }
 
-  // Increase difficulty gradually
-  spawnRate = Math.max(2500 - wave * 150, 1200);
+  // Increase difficulty very gradually
+  spawnRate = Math.max(3000 - wave * 100, 1800);
 
   // Recycle bullets off-screen
   bulletsGroup.children.iterate(bullet => {
     if (bullet && bullet.y < -20) bullet.destroy();
-  });
-
-  // Recycle asteroids that fall off bottom
-  asteroidsGroup.children.iterate(ast => {
-    if (ast && ast.y > 450) {
-      ast.destroy();
-    }
   });
 
   // Check if wave cleared
@@ -335,22 +318,21 @@ function update(time, delta) {
 
 function spawnAsteroid() {
   const x = Phaser.Math.Between(50, 750);
-  const y = -40;
+  const y = 50;
 
-  const ast = asteroidsGroup.create(x, y, "asteroid1");
-  ast.setData("size", 1);
-  // Much slower falling speed
-  ast.body.setVelocity(Phaser.Math.Between(-50, 50), 120);
-  ast.setBounce(0.2);
-  ast.body.setCollideWorldBounds(true);
+  const ast = asteroidsGroup.create(x, y, "asteroid");
+  // Very slow downward movement
+  ast.body.setVelocityY(80 + wave * 10);
+  ast.body.setCollideWorldBounds(false);
 }
 
 function spawnWave() {
   asteroidsGroup.clear(true, true);
   spawnTimer = 0;
-  const count = 3 + wave;
+  // Spawn fewer asteroids at start, increase slowly
+  const count = 2 + Math.floor(wave / 2);
   for (let i = 0; i < count; i++) {
-    this.time.delayedCall(i * 400, () => {
+    this.time.delayedCall(i * 500, () => {
       spawnAsteroid.call(this);
     });
   }
@@ -362,56 +344,21 @@ function shoot() {
 }
 
 function hitAsteroid(bullet, asteroid) {
-  const size = asteroid.getData("size");
-
   // Remove bullet
   bullet.destroy();
 
   // Particle burst
   particles.emitParticleAt(asteroid.x, asteroid.y, 20);
 
-  // Score based on size (large = more points)
-  score += (4 - size) * 10;
+  // Score
+  score += 10;
 
-  // If large or medium, break into smaller ones
-  if (size === 1) {
-    // Large → 2 Medium asteroids
-    for (let i = 0; i < 2; i++) {
-      const newAst = asteroidsGroup.create(
-        asteroid.x + Phaser.Math.Between(-15, 15),
-        asteroid.y + Phaser.Math.Between(-10, 10),
-        "asteroid2"
-      );
-      newAst.setData("size", 2);
-      newAst.body.setVelocity(
-        Phaser.Math.Between(-100, 100),
-        Phaser.Math.Between(50, 120)
-      );
-      newAst.setBounce(0.3);
-    }
-  } else if (size === 2) {
-    // Medium → 2 Small asteroids
-    for (let i = 0; i < 2; i++) {
-      const newAst = asteroidsGroup.create(
-        asteroid.x + Phaser.Math.Between(-10, 10),
-        asteroid.y + Phaser.Math.Between(-5, 5),
-        "asteroid3"
-      );
-      newAst.setData("size", 3);
-      newAst.body.setVelocity(
-        Phaser.Math.Between(-100, 100),
-        Phaser.Math.Between(50, 100)
-      );
-      newAst.setBounce(0.3);
-    }
-  }
-  // If size 3 (small), just disappear - no more breaking
-
-  // Destroy the asteroid
+  // Asteroid disappears completely (no breaking)
   asteroid.destroy();
 }
 
-function hitPlayer(player, asteroid) {
+function hitGround(asteroid) {
+  // Asteroid hit the ground
   health--;
   asteroid.destroy();
 
