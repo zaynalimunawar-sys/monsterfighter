@@ -192,7 +192,7 @@ const config = {
   physics: {
     default: "arcade",
     arcade: {
-      gravity: { y: 600 },
+      gravity: { y: 300 },
       debug: false
     }
   },
@@ -201,13 +201,13 @@ const config = {
 
 let game = new Phaser.Game(config);
 
-let player, asteroids, bullets, particles;
+let player, particles;
 let score = 0;
 let health = 3;
 let wave = 1;
 let isGameOver = false;
 let spawnTimer = 0;
-let spawnRate = 2000;
+let spawnRate = 2500;
 let bulletsGroup;
 let asteroidsGroup;
 
@@ -225,7 +225,7 @@ function preload() {
   g.generateTexture("player", 32, 32);
   g.clear();
 
-  // Large asteroid
+  // Large asteroid (size 1)
   g.fillStyle(0xff8c42);
   g.fillCircle(16, 16, 14);
   g.lineStyle(2, 0xffaa55);
@@ -236,7 +236,7 @@ function preload() {
   g.generateTexture("asteroid1", 32, 32);
   g.clear();
 
-  // Medium asteroid
+  // Medium asteroid (size 2)
   g.fillStyle(0xff8c42);
   g.fillCircle(12, 12, 10);
   g.lineStyle(2, 0xffaa55);
@@ -246,7 +246,7 @@ function preload() {
   g.generateTexture("asteroid2", 24, 24);
   g.clear();
 
-  // Small asteroid
+  // Small asteroid (size 3 - final)
   g.fillStyle(0xff8c42);
   g.fillCircle(8, 8, 6);
   g.lineStyle(1, 0xffaa55);
@@ -307,12 +307,19 @@ function update(time, delta) {
     spawnAsteroid.call(this);
   }
 
-  // Increase difficulty
-  spawnRate = Math.max(1000 - wave * 100, 500);
+  // Increase difficulty gradually
+  spawnRate = Math.max(2500 - wave * 150, 1200);
 
   // Recycle bullets off-screen
   bulletsGroup.children.iterate(bullet => {
     if (bullet && bullet.y < -20) bullet.destroy();
+  });
+
+  // Recycle asteroids that fall off bottom
+  asteroidsGroup.children.iterate(ast => {
+    if (ast && ast.y > 450) {
+      ast.destroy();
+    }
   });
 
   // Check if wave cleared
@@ -332,18 +339,18 @@ function spawnAsteroid() {
 
   const ast = asteroidsGroup.create(x, y, "asteroid1");
   ast.setData("size", 1);
-  ast.body.setVelocity(Phaser.Math.Between(-100, 100), Phaser.Math.Between(150, 250));
-  ast.setBounce(0.3);
+  // Much slower falling speed
+  ast.body.setVelocity(Phaser.Math.Between(-50, 50), 120);
+  ast.setBounce(0.2);
   ast.body.setCollideWorldBounds(true);
-  ast.body.onWorldBounds = true;
 }
 
 function spawnWave() {
   asteroidsGroup.clear(true, true);
   spawnTimer = 0;
-  const count = 3 + wave * 2;
+  const count = 3 + wave;
   for (let i = 0; i < count; i++) {
-    this.time.delayedCall(i * 300, () => {
+    this.time.delayedCall(i * 400, () => {
       spawnAsteroid.call(this);
     });
   }
@@ -351,7 +358,7 @@ function spawnWave() {
 
 function shoot() {
   const bullet = bulletsGroup.create(player.x, player.y - 20, "bullet");
-  bullet.setVelocityY(-500);
+  bullet.setVelocityY(-600);
 }
 
 function hitAsteroid(bullet, asteroid) {
@@ -360,29 +367,47 @@ function hitAsteroid(bullet, asteroid) {
   // Remove bullet
   bullet.destroy();
 
-  // Score based on size
-  score += (3 - size) * 10;
-
   // Particle burst
-  particles.emitParticleAt(asteroid.x, asteroid.y, 15);
+  particles.emitParticleAt(asteroid.x, asteroid.y, 20);
 
-  // Break into smaller asteroids
-  if (size < 3) {
+  // Score based on size (large = more points)
+  score += (4 - size) * 10;
+
+  // If large or medium, break into smaller ones
+  if (size === 1) {
+    // Large → 2 Medium asteroids
     for (let i = 0; i < 2; i++) {
       const newAst = asteroidsGroup.create(
-        asteroid.x + Phaser.Math.Between(-20, 20),
-        asteroid.y + Phaser.Math.Between(-20, 20),
-        "asteroid" + (size + 1)
+        asteroid.x + Phaser.Math.Between(-15, 15),
+        asteroid.y + Phaser.Math.Between(-10, 10),
+        "asteroid2"
       );
-      newAst.setData("size", size + 1);
+      newAst.setData("size", 2);
       newAst.body.setVelocity(
-        Phaser.Math.Between(-200, 200),
-        Phaser.Math.Between(-100, 100)
+        Phaser.Math.Between(-100, 100),
+        Phaser.Math.Between(50, 120)
       );
-      newAst.setBounce(0.5);
+      newAst.setBounce(0.3);
+    }
+  } else if (size === 2) {
+    // Medium → 2 Small asteroids
+    for (let i = 0; i < 2; i++) {
+      const newAst = asteroidsGroup.create(
+        asteroid.x + Phaser.Math.Between(-10, 10),
+        asteroid.y + Phaser.Math.Between(-5, 5),
+        "asteroid3"
+      );
+      newAst.setData("size", 3);
+      newAst.body.setVelocity(
+        Phaser.Math.Between(-100, 100),
+        Phaser.Math.Between(50, 100)
+      );
+      newAst.setBounce(0.3);
     }
   }
+  // If size 3 (small), just disappear - no more breaking
 
+  // Destroy the asteroid
   asteroid.destroy();
 }
 
