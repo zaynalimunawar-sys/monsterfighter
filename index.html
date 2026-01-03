@@ -35,6 +35,43 @@
       50% { transform: scale(1.05); }
     }
 
+    @keyframes glitchText {
+      0%, 100% { 
+        transform: translate(0);
+        text-shadow: 0 0 30px var(--primary-glow);
+      }
+      20% { 
+        transform: translate(-2px, 2px);
+        text-shadow: 2px 0 var(--primary), -2px 0 var(--danger);
+      }
+      40% { 
+        transform: translate(2px, -2px);
+        text-shadow: -2px 0 var(--primary), 2px 0 var(--danger);
+      }
+      60% { 
+        transform: translate(-2px, 2px);
+      }
+      80% { 
+        transform: translate(2px, -2px);
+      }
+    }
+
+    @keyframes scanLine {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(100%); }
+    }
+
+    @keyframes fadeInScale {
+      0% { 
+        opacity: 0;
+        transform: scale(0.8);
+      }
+      100% { 
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
     body {
       margin: 0;
       padding: 0;
@@ -64,9 +101,115 @@
       z-index: 0;
     }
 
+    /* START SCREEN */
+    .start-screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 300;
+      background: rgba(0, 0, 0, 0.95);
+      backdrop-filter: blur(20px);
+      animation: fadeInScale 0.8s ease;
+    }
+
+    .start-screen.hidden {
+      display: none;
+    }
+
+    .scan-effect {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .scan-line {
+      position: absolute;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(transparent, var(--primary), transparent);
+      box-shadow: 0 0 20px var(--primary-glow);
+      animation: scanLine 4s linear infinite;
+    }
+
+    .logo-text {
+      font-size: 72px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #64c8ff 0%, #00d4ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-transform: uppercase;
+      letter-spacing: 8px;
+      margin-bottom: 40px;
+      animation: glitchText 3s ease-in-out infinite;
+      text-shadow: 0 0 40px var(--primary-glow);
+    }
+
+    .ready-text {
+      font-size: 56px;
+      font-weight: 800;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 12px;
+      margin-bottom: 60px;
+      animation: pulse 2s ease-in-out infinite;
+      text-shadow: 
+        0 0 20px var(--primary-glow),
+        0 0 40px var(--primary-glow),
+        0 0 60px var(--primary-glow);
+    }
+
+    .start-button {
+      background: linear-gradient(135deg, #64c8ff 0%, #00d4ff 100%);
+      color: white;
+      border: 2px solid var(--primary);
+      padding: 20px 60px;
+      border-radius: 50px;
+      font-size: 24px;
+      font-weight: 800;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      box-shadow: 
+        0 0 30px var(--primary-glow),
+        0 8px 24px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      transition: all 0.3s ease;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .start-button:hover {
+      transform: translateY(-3px) scale(1.05);
+      box-shadow: 
+        0 0 50px var(--primary-glow),
+        0 12px 36px rgba(0, 0, 0, 0.5);
+    }
+
+    .start-button:active {
+      transform: translateY(0) scale(1);
+    }
+
+    .instruction-text {
+      position: absolute;
+      bottom: 60px;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
     #game-container {
       position: relative;
       z-index: 1;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+
+    #game-container.active {
+      opacity: 1;
     }
 
     canvas {
@@ -87,6 +230,12 @@
       align-items: flex-start;
       z-index: 100;
       gap: 16px;
+      opacity: 0;
+      transition: opacity 0.5s ease 0.3s;
+    }
+
+    .hud.active {
+      opacity: 1;
     }
 
     .glass-card {
@@ -224,6 +373,12 @@
       align-items: center;
       gap: 12px;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      opacity: 0;
+      transition: opacity 0.5s ease 0.3s;
+    }
+
+    .difficulty-indicator.active {
+      opacity: 1;
     }
 
     .difficulty-label {
@@ -374,6 +529,9 @@
     }
 
     @media (max-width: 600px) {
+      .logo-text { font-size: 48px; letter-spacing: 4px; }
+      .ready-text { font-size: 36px; letter-spacing: 8px; }
+      .start-button { padding: 16px 40px; font-size: 20px; }
       .hud { top: calc(var(--safe-area-top) + 16px); left: 16px; right: 16px; }
       .glass-card { padding: 16px 20px; border-radius: 20px; }
       .score-value { font-size: 32px; }
@@ -390,9 +548,20 @@
 </head>
 <body>
 
+<!-- START SCREEN -->
+<div class="start-screen" id="start-screen">
+  <div class="scan-effect">
+    <div class="scan-line"></div>
+  </div>
+  <div class="logo-text">ASTEROID</div>
+  <div class="ready-text">ARE YOU READY?</div>
+  <button class="start-button" id="start-btn">START MISSION</button>
+  <div class="instruction-text">Move: Swipe/Arrow Keys • Shoot: Tap/Space</div>
+</div>
+
 <div id="game-container"></div>
 
-<div class="hud">
+<div class="hud" id="hud">
   <div class="glass-card score-card">
     <div class="stat-group">
       <div class="score-label">Score</div>
@@ -413,7 +582,7 @@
   <div class="glass-card wave-badge" id="wave-text">WAVE 1</div>
 </div>
 
-<div class="difficulty-indicator">
+<div class="difficulty-indicator" id="difficulty-indicator">
   <div class="difficulty-label">DIFFICULTY</div>
   <div class="difficulty-bar">
     <div class="difficulty-fill" id="difficulty-fill" style="width: 10%"></div>
@@ -445,27 +614,51 @@
 </div>
 
 <script>
-const config = {
-  type: Phaser.AUTO,
-  width: 800,
-  height: 500,
-  backgroundColor: "transparent",
-  parent: "game-container",
-  scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH
-  },
-  physics: {
-    default: "arcade",
-    arcade: {
-      gravity: { y: 0 },
-      debug: false
-    }
-  },
-  scene: { preload, create, update }
-};
+let gameStarted = false;
+let phaserGame;
 
-let game = new Phaser.Game(config);
+// Start button handler
+document.getElementById('start-btn').addEventListener('click', startGame);
+
+function startGame() {
+  if (gameStarted) return;
+  gameStarted = true;
+  
+  // Hide start screen
+  document.getElementById('start-screen').classList.add('hidden');
+  
+  // Show game elements
+  document.getElementById('game-container').classList.add('active');
+  document.getElementById('hud').classList.add('active');
+  document.getElementById('difficulty-indicator').classList.add('active');
+  
+  // Initialize Phaser game
+  initPhaserGame();
+}
+
+function initPhaserGame() {
+  const config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 500,
+    backgroundColor: "transparent",
+    parent: "game-container",
+    scale: {
+      mode: Phaser.Scale.FIT,
+      autoCenter: Phaser.Scale.CENTER_BOTH
+    },
+    physics: {
+      default: "arcade",
+      arcade: {
+        gravity: { y: 0 },
+        debug: false
+      }
+    },
+    scene: { preload, create, update }
+  };
+
+  phaserGame = new Phaser.Game(config);
+}
 
 let player, particles, explosionParticles, trailParticles;
 let score = 0;
@@ -486,7 +679,7 @@ let speedIncrement = 0;
 function preload() {
   const g = this.add.graphics();
 
-  // Premium player ship with glow
+  // Premium player ship
   g.fillStyle(0x64c8ff);
   g.beginPath();
   g.moveTo(24, 0);
@@ -504,7 +697,7 @@ function preload() {
   g.generateTexture("player", 48, 40);
   g.clear();
 
-  // Premium asteroid with detail
+  // Asteroid
   g.fillStyle(0xff8c42);
   g.fillCircle(20, 20, 18);
   g.lineStyle(3, 0xffaa55);
@@ -518,7 +711,7 @@ function preload() {
   g.generateTexture("asteroid", 40, 40);
   g.clear();
 
-  // Premium bullet with glow trail
+  // Bullet
   g.fillStyle(0x64c8ff);
   g.fillRoundedRect(0, 0, 8, 20, 4);
   g.fillStyle(0xffffff);
@@ -584,7 +777,6 @@ function update(time, delta) {
     nextWave.call(this);
   }
 
-  // Update HUD
   document.getElementById("score-text").textContent = score;
   document.getElementById("wave-text").textContent = "WAVE " + wave;
   
@@ -641,7 +833,6 @@ function shoot() {
   const bullet = bulletsGroup.create(player.x, player.y - 20, "bullet");
   bullet.setVelocityY(-700);
   
-  // Bullet trail
   trailParticles.createEmitter({
     follow: bullet,
     quantity: 2,
