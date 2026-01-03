@@ -181,7 +181,6 @@
       z-index: 0;
     }
 
-    /* START SCREEN */
     .start-screen {
       position: fixed;
       inset: 0;
@@ -344,10 +343,6 @@
 
     .start-button:active {
       transform: scale(0.96);
-      box-shadow: 
-        0 0 20px var(--primary-glow),
-        0 4px 16px rgba(0, 0, 0, 0.4),
-        inset 0 2px 0 rgba(255, 255, 255, 0.4);
     }
 
     .instruction-text {
@@ -638,7 +633,6 @@
       margin: 0 0 20px 0;
       letter-spacing: -2px;
       text-transform: uppercase;
-      text-shadow: 0 0 40px var(--primary-glow);
     }
 
     .modal-score {
@@ -650,7 +644,6 @@
       font-family: "SF Mono", "Monaco", monospace;
       margin: 0 0 16px 0;
       letter-spacing: -2px;
-      text-shadow: 0 0 50px var(--danger-glow);
     }
 
     .modal-stats {
@@ -707,7 +700,6 @@
       transform: scale(0.95);
     }
 
-    /* DESKTOP/LANDSCAPE */
     @media (min-width: 900px) {
       .logo-icon { font-size: 120px; }
       .logo-text { font-size: 64px; letter-spacing: 12px; }
@@ -737,7 +729,6 @@
 </head>
 <body>
 
-<!-- START SCREEN -->
 <div class="start-screen" id="start-screen">
   <div class="scan-effect">
     <div class="scan-line"></div>
@@ -888,12 +879,13 @@ let isGameOver = false;
 let spawnTimer = 0;
 let spawnRate = 2000;
 let fireTimer = 0;
-let fireRate = 300; // Auto-fire every 300ms
+let fireRate = 300;
 let bulletsGroup;
 let asteroidsGroup;
 let isInvulnerable = false;
 let baseSpeed = 100;
 let speedIncrement = 0;
+let gameScene;
 
 function preload() {
   const g = this.add.graphics();
@@ -937,6 +929,8 @@ function preload() {
 }
 
 function create() {
+  gameScene = this;
+  
   const centerX = this.sys.canvas.width / 2;
   const bottomY = this.sys.canvas.height - 60;
 
@@ -952,7 +946,7 @@ function create() {
   trailParticles = this.add.particles(0x64c8ff);
 
   this.input.on("pointermove", (pointer) => {
-    if (!isGameOver) {
+    if (!isGameOver && player) {
       const minX = 40;
       const maxX = this.sys.canvas.width - 40;
       player.x = Phaser.Math.Clamp(pointer.x, minX, maxX);
@@ -960,10 +954,10 @@ function create() {
   });
 
   this.input.keyboard.on("keydown-LEFT", () => {
-    if (!isGameOver) player.x = Phaser.Math.Clamp(player.x - 30, 40, this.sys.canvas.width - 40);
+    if (!isGameOver && player) player.x = Phaser.Math.Clamp(player.x - 30, 40, this.sys.canvas.width - 40);
   });
   this.input.keyboard.on("keydown-RIGHT", () => {
-    if (!isGameOver) player.x = Phaser.Math.Clamp(player.x + 30, 40, this.sys.canvas.width - 40);
+    if (!isGameOver && player) player.x = Phaser.Math.Clamp(player.x + 30, 40, this.sys.canvas.width - 40);
   });
 
   this.physics.add.overlap(bulletsGroup, asteroidsGroup, hitAsteroid, null, this);
@@ -973,12 +967,11 @@ function create() {
 }
 
 function update(time, delta) {
-  if (isGameOver) return;
+  if (isGameOver || !player) return;
 
   speedIncrement = Math.floor(score / 50) * 20;
   spawnRate = Math.max(2000 - Math.floor(score / 30) * 100, 700);
 
-  // AUTO-FIRE: Shoot automatically
   fireTimer += delta;
   if (fireTimer > fireRate) {
     fireTimer = 0;
@@ -991,12 +984,16 @@ function update(time, delta) {
     spawnAsteroid.call(this);
   }
 
-  bulletsGroup.children.iterate(bullet => {
-    if (bullet && bullet.y < -20) bullet.destroy();
+  bulletsGroup.children.entries.forEach(bullet => {
+    if (bullet && bullet.active && bullet.y < -20) {
+      bullet.destroy();
+    }
   });
 
-  asteroidsGroup.children.iterate(asteroid => {
-    if (asteroid && asteroid.y > this.sys.canvas.height + 20) asteroid.destroy();
+  asteroidsGroup.children.entries.forEach(asteroid => {
+    if (asteroid && asteroid.active && asteroid.y > this.sys.canvas.height + 20) {
+      asteroid.destroy();
+    }
   });
 
   if (asteroidsGroup.countActive(true) === 0 && spawnTimer > 500) {
@@ -1015,24 +1012,28 @@ function update(time, delta) {
 }
 
 function spawnAsteroid() {
-  const x = Phaser.Math.Between(60, this.sys.canvas.width - 60);
+  if (!gameScene || isGameOver) return;
+  
+  const x = Phaser.Math.Between(60, gameScene.sys.canvas.width - 60);
   const y = 20;
 
   const ast = asteroidsGroup.create(x, y, "asteroid");
+  if (!ast) return;
+  
   const fallSpeed = baseSpeed + speedIncrement + wave * 15;
   ast.body.setVelocityY(fallSpeed);
   ast.body.setCircle(18);
   ast.setScale(0);
   ast.setRotation(Phaser.Math.FloatBetween(0, Math.PI * 2));
   
-  this.tweens.add({
+  gameScene.tweens.add({
     targets: ast,
     scale: 1,
     duration: 400,
     ease: 'Elastic.easeOut'
   });
   
-  this.tweens.add({
+  gameScene.tweens.add({
     targets: ast,
     rotation: ast.rotation + Math.PI * 2,
     duration: 3000,
@@ -1041,22 +1042,26 @@ function spawnAsteroid() {
 }
 
 function spawnWave() {
+  if (!gameScene) return;
+  
   asteroidsGroup.clear(true, true);
   spawnTimer = 0;
   const count = 3 + Math.floor(score / 80) + wave;
   
   for (let i = 0; i < count; i++) {
-    this.time.delayedCall(i * 350, () => {
-      spawnAsteroid.call(this);
+    gameScene.time.delayedCall(i * 350, () => {
+      spawnAsteroid.call(gameScene);
     });
   }
 }
 
 function shoot() {
-  if (isGameOver) return;
+  if (isGameOver || !player || !gameScene) return;
   shotsFired++;
   
   const bullet = bulletsGroup.create(player.x, player.y - 20, "bullet");
+  if (!bullet) return;
+  
   bullet.setVelocityY(-700);
   
   trailParticles.createEmitter({
@@ -1070,6 +1075,8 @@ function shoot() {
 }
 
 function hitAsteroid(bullet, asteroid) {
+  if (!bullet || !asteroid) return;
+  
   bullet.destroy();
   shotsHit++;
   kills++;
@@ -1079,52 +1086,54 @@ function hitAsteroid(bullet, asteroid) {
 
   score += 10;
 
-  this.tweens.add({
+  gameScene.tweens.add({
     targets: asteroid,
     scale: 1.5,
     alpha: 0,
     duration: 200,
     ease: 'Power2',
-    onComplete: () => asteroid.destroy()
+    onComplete: () => {
+      if (asteroid) asteroid.destroy();
+    }
   });
 }
 
-function hitPlayer(player, asteroid) {
-  if (isInvulnerable) return;
+function hitPlayer(playerObj, asteroid) {
+  if (isInvulnerable || !asteroid) return;
 
   health--;
   asteroid.destroy();
 
   const hearts = document.querySelectorAll(".heart");
-  hearts[health].classList.add("lost");
+  if (hearts[health]) hearts[health].classList.add("lost");
 
   isInvulnerable = true;
   let flashCount = 0;
   const flashInterval = setInterval(() => {
-    player.alpha = player.alpha === 1 ? 0.3 : 1;
+    if (player) player.alpha = player.alpha === 1 ? 0.3 : 1;
     flashCount++;
     if (flashCount >= 10) {
       clearInterval(flashInterval);
-      player.alpha = 1;
+      if (player) player.alpha = 1;
       isInvulnerable = false;
     }
   }, 80);
 
-  explosionParticles.emitParticleAt(player.x, player.y, 40);
+  explosionParticles.emitParticleAt(playerObj.x, playerObj.y, 40);
 
   if (health <= 0) {
-    endGame.call(this);
+    endGame.call(gameScene);
   }
 }
 
 function nextWave() {
   wave++;
-  spawnWave.call(this);
+  spawnWave.call(gameScene);
 }
 
 function endGame() {
   isGameOver = true;
-  player.setTint(0xff6b9d);
+  if (player) player.setTint(0xff6b9d);
   
   const accuracy = shotsFired > 0 ? Math.round((shotsHit / shotsFired) * 100) : 0;
   
