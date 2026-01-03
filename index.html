@@ -761,11 +761,11 @@
 
   <div class="feature-badges">
     <div class="badge">🎮 Premium</div>
-    <div class="badge">⚡ Fast-Paced</div>
+    <div class="badge">⚡ Auto-Fire</div>
     <div class="badge">🏆 Competitive</div>
   </div>
 
-  <div class="instruction-text">Swipe or use arrow keys to move<br>Tap or press space to shoot</div>
+  <div class="instruction-text">Just move to dodge asteroids<br>Auto-fire enabled - No tapping needed!</div>
 </div>
 
 <div id="game-container"></div>
@@ -887,6 +887,8 @@ let shotsHit = 0;
 let isGameOver = false;
 let spawnTimer = 0;
 let spawnRate = 2000;
+let fireTimer = 0;
+let fireRate = 300; // Auto-fire every 300ms
 let bulletsGroup;
 let asteroidsGroup;
 let isInvulnerable = false;
@@ -964,9 +966,6 @@ function create() {
     if (!isGameOver) player.x = Phaser.Math.Clamp(player.x + 30, 40, this.sys.canvas.width - 40);
   });
 
-  this.input.on("pointerdown", shoot, this);
-  this.input.keyboard.on("keydown-SPACE", shoot, this);
-
   this.physics.add.overlap(bulletsGroup, asteroidsGroup, hitAsteroid, null, this);
   this.physics.add.overlap(player, asteroidsGroup, hitPlayer, null, this);
 
@@ -978,6 +977,13 @@ function update(time, delta) {
 
   speedIncrement = Math.floor(score / 50) * 20;
   spawnRate = Math.max(2000 - Math.floor(score / 30) * 100, 700);
+
+  // AUTO-FIRE: Shoot automatically
+  fireTimer += delta;
+  if (fireTimer > fireRate) {
+    fireTimer = 0;
+    shoot.call(this);
+  }
 
   spawnTimer += delta;
   if (spawnTimer > spawnRate) {
