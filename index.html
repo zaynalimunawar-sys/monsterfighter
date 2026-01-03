@@ -37,38 +37,108 @@
 
     @keyframes glitchText {
       0%, 100% { 
-        transform: translate(0);
-        text-shadow: 0 0 30px var(--primary-glow);
+        transform: translate(0) skew(0deg);
+        text-shadow: 
+          0 0 40px var(--primary-glow),
+          0 0 80px var(--primary-glow);
       }
-      20% { 
-        transform: translate(-2px, 2px);
-        text-shadow: 2px 0 var(--primary), -2px 0 var(--danger);
+      14% { 
+        transform: translate(-3px, 3px) skew(-2deg);
+        text-shadow: 
+          3px 0 var(--primary), 
+          -3px 0 var(--danger),
+          0 0 40px var(--primary-glow);
       }
-      40% { 
-        transform: translate(2px, -2px);
-        text-shadow: -2px 0 var(--primary), 2px 0 var(--danger);
+      15% { 
+        transform: translate(3px, -3px) skew(2deg);
+        text-shadow: 
+          -3px 0 var(--primary), 
+          3px 0 var(--danger);
       }
-      60% { 
-        transform: translate(-2px, 2px);
+      16% { 
+        transform: translate(0) skew(0deg);
       }
-      80% { 
-        transform: translate(2px, -2px);
+      49% { 
+        transform: translate(0) skew(0deg);
+      }
+      50% { 
+        transform: translate(2px, 2px) skew(1deg);
+        text-shadow: 
+          -2px 0 var(--primary), 
+          2px 0 var(--danger);
+      }
+      51% { 
+        transform: translate(-2px, -2px) skew(-1deg);
+      }
+      52% { 
+        transform: translate(0) skew(0deg);
       }
     }
 
     @keyframes scanLine {
-      0% { transform: translateY(-100%); }
-      100% { transform: translateY(100%); }
+      0% { transform: translateY(-100%); opacity: 0.3; }
+      50% { opacity: 0.6; }
+      100% { transform: translateY(100vh); opacity: 0.3; }
     }
 
     @keyframes fadeInScale {
       0% { 
         opacity: 0;
-        transform: scale(0.8);
+        transform: scale(0.9);
       }
       100% { 
         opacity: 1;
         transform: scale(1);
+      }
+    }
+
+    @keyframes meteorShower {
+      0% {
+        transform: translateX(-100px) translateY(-100px);
+        opacity: 0;
+      }
+      10% {
+        opacity: 1;
+      }
+      90% {
+        opacity: 1;
+      }
+      100% {
+        transform: translateX(300px) translateY(300px);
+        opacity: 0;
+      }
+    }
+
+    @keyframes buttonGlow {
+      0%, 100% {
+        box-shadow: 
+          0 0 20px var(--primary-glow),
+          0 8px 24px rgba(0, 0, 0, 0.4),
+          inset 0 1px 0 rgba(255, 255, 255, 0.3);
+      }
+      50% {
+        box-shadow: 
+          0 0 40px var(--primary-glow),
+          0 0 60px var(--primary-glow),
+          0 12px 32px rgba(0, 0, 0, 0.5),
+          inset 0 1px 0 rgba(255, 255, 255, 0.5);
+      }
+    }
+
+    @keyframes floatText {
+      0%, 100% {
+        transform: translateY(0px);
+        text-shadow: 
+          0 0 30px var(--primary-glow),
+          0 0 60px var(--primary-glow),
+          0 0 90px var(--primary-glow);
+      }
+      50% {
+        transform: translateY(-8px);
+        text-shadow: 
+          0 0 40px var(--primary-glow),
+          0 0 80px var(--primary-glow),
+          0 0 120px var(--primary-glow);
       }
     }
 
@@ -100,6 +170,7 @@
         radial-gradient(2px 2px at 90% 60%, white, transparent),
         radial-gradient(1px 1px at 33% 80%, white, transparent),
         radial-gradient(1px 1px at 70% 40%, white, transparent),
+        radial-gradient(3px 3px at 15% 65%, rgba(100, 200, 255, 0.8), transparent),
         linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #2a3456 100%);
       background-size: 200% 200%;
       animation: starTwinkle 3s ease-in-out infinite;
@@ -115,9 +186,9 @@
       align-items: center;
       justify-content: center;
       z-index: 300;
-      background: rgba(0, 0, 0, 0.95);
+      background: radial-gradient(ellipse at center, rgba(10, 14, 39, 0.98) 0%, rgba(0, 0, 0, 0.99) 100%);
       backdrop-filter: blur(20px);
-      animation: fadeInScale 0.8s ease;
+      animation: fadeInScale 1s ease;
     }
 
     .start-screen.hidden {
@@ -134,71 +205,175 @@
     .scan-line {
       position: absolute;
       width: 100%;
+      height: 4px;
+      background: linear-gradient(transparent, rgba(100, 200, 255, 0.8), transparent);
+      box-shadow: 0 0 30px var(--primary-glow), 0 0 60px var(--primary-glow);
+      animation: scanLine 6s linear infinite;
+    }
+
+    .meteor {
+      position: absolute;
+      width: 3px;
       height: 3px;
-      background: linear-gradient(transparent, var(--primary), transparent);
-      box-shadow: 0 0 20px var(--primary-glow);
-      animation: scanLine 4s linear infinite;
+      background: linear-gradient(90deg, transparent, white);
+      border-radius: 50%;
+      box-shadow: 0 0 10px white;
+    }
+
+    .meteor:nth-child(1) {
+      top: 10%;
+      left: 20%;
+      animation: meteorShower 3s ease-in-out infinite;
+      animation-delay: 0s;
+    }
+
+    .meteor:nth-child(2) {
+      top: 30%;
+      left: 60%;
+      animation: meteorShower 4s ease-in-out infinite;
+      animation-delay: 1s;
+    }
+
+    .meteor:nth-child(3) {
+      top: 50%;
+      left: 80%;
+      animation: meteorShower 3.5s ease-in-out infinite;
+      animation-delay: 2s;
+    }
+
+    .logo-container {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+
+    .logo-icon {
+      font-size: 120px;
+      margin-bottom: 20px;
+      filter: drop-shadow(0 0 30px var(--primary-glow));
+      animation: float 3s ease-in-out infinite;
     }
 
     .logo-text {
-      font-size: 72px;
+      font-size: 64px;
       font-weight: 900;
-      background: linear-gradient(135deg, #64c8ff 0%, #00d4ff 100%);
+      background: linear-gradient(135deg, #64c8ff 0%, #00d4ff 50%, #64c8ff 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       text-transform: uppercase;
-      letter-spacing: 8px;
-      margin-bottom: 40px;
-      animation: glitchText 3s ease-in-out infinite;
-      text-shadow: 0 0 40px var(--primary-glow);
+      letter-spacing: 12px;
+      margin-bottom: 8px;
+      animation: glitchText 5s ease-in-out infinite;
+      font-family: 'Arial Black', sans-serif;
+    }
+
+    .logo-subtitle {
+      font-size: 18px;
+      font-weight: 600;
+      color: rgba(100, 200, 255, 0.7);
+      text-transform: uppercase;
+      letter-spacing: 6px;
+      margin-bottom: 20px;
+    }
+
+    .ready-section {
+      text-align: center;
+      margin-bottom: 50px;
     }
 
     .ready-text {
-      font-size: 56px;
+      font-size: 48px;
       font-weight: 800;
       color: var(--primary);
       text-transform: uppercase;
-      letter-spacing: 12px;
-      margin-bottom: 60px;
-      animation: pulse 2s ease-in-out infinite;
-      text-shadow: 
-        0 0 20px var(--primary-glow),
-        0 0 40px var(--primary-glow),
-        0 0 60px var(--primary-glow);
+      letter-spacing: 8px;
+      margin-bottom: 20px;
+      animation: floatText 3s ease-in-out infinite;
+      font-family: 'Arial Black', sans-serif;
+    }
+
+    .ready-subtitle {
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.5);
+      letter-spacing: 3px;
+      text-transform: uppercase;
     }
 
     .start-button {
       background: linear-gradient(135deg, #64c8ff 0%, #00d4ff 100%);
       color: white;
-      border: 2px solid var(--primary);
-      padding: 20px 60px;
+      border: 3px solid rgba(100, 200, 255, 0.5);
+      padding: 22px 70px;
       border-radius: 50px;
       font-size: 24px;
-      font-weight: 800;
+      font-weight: 900;
       cursor: pointer;
       text-transform: uppercase;
-      letter-spacing: 3px;
+      letter-spacing: 4px;
       box-shadow: 
         0 0 30px var(--primary-glow),
         0 8px 24px rgba(0, 0, 0, 0.4),
-        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        inset 0 2px 0 rgba(255, 255, 255, 0.4),
+        inset 0 -2px 0 rgba(0, 0, 0, 0.2);
       transition: all 0.3s ease;
-      animation: pulse 2s ease-in-out infinite;
+      animation: buttonGlow 2s ease-in-out infinite;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .start-button::before {
+      content: "";
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      transform: rotate(45deg);
+      animation: buttonShine 3s ease-in-out infinite;
+    }
+
+    @keyframes buttonShine {
+      0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+      50%, 100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
     }
 
     .start-button:active {
-      transform: scale(0.95);
+      transform: scale(0.96);
+      box-shadow: 
+        0 0 20px var(--primary-glow),
+        0 4px 16px rgba(0, 0, 0, 0.4),
+        inset 0 2px 0 rgba(255, 255, 255, 0.4);
     }
 
     .instruction-text {
       position: absolute;
       bottom: 60px;
       font-size: 14px;
-      color: rgba(255, 255, 255, 0.5);
+      color: rgba(255, 255, 255, 0.4);
       text-transform: uppercase;
       letter-spacing: 2px;
       text-align: center;
       padding: 0 20px;
+    }
+
+    .feature-badges {
+      display: flex;
+      gap: 16px;
+      margin-top: 30px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      background: rgba(100, 200, 255, 0.1);
+      border: 1px solid rgba(100, 200, 255, 0.3);
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-size: 12px;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 700;
     }
 
     #game-container {
@@ -529,10 +704,14 @@
 
     /* PORTRAIT MODE (iPhone) */
     @media (max-width: 600px) and (orientation: portrait) {
-      .logo-text { font-size: 48px; letter-spacing: 4px; margin-bottom: 30px; }
-      .ready-text { font-size: 32px; letter-spacing: 6px; margin-bottom: 40px; }
-      .start-button { padding: 16px 40px; font-size: 18px; }
-      .instruction-text { font-size: 12px; bottom: 40px; }
+      .logo-icon { font-size: 80px; }
+      .logo-text { font-size: 42px; letter-spacing: 6px; margin-bottom: 6px; }
+      .logo-subtitle { font-size: 14px; letter-spacing: 4px; }
+      .ready-text { font-size: 36px; letter-spacing: 6px; margin-bottom: 16px; }
+      .ready-subtitle { font-size: 13px; }
+      .start-button { padding: 18px 50px; font-size: 20px; }
+      .instruction-text { font-size: 11px; bottom: 40px; }
+      .badge { font-size: 10px; padding: 6px 16px; }
     }
 
     /* DESKTOP/LANDSCAPE */
@@ -559,11 +738,31 @@
 <div class="start-screen" id="start-screen">
   <div class="scan-effect">
     <div class="scan-line"></div>
+    <div class="meteor"></div>
+    <div class="meteor"></div>
+    <div class="meteor"></div>
   </div>
-  <div class="logo-text">ASTEROID</div>
-  <div class="ready-text">ARE YOU READY?</div>
+  
+  <div class="logo-container">
+    <div class="logo-icon">🛸</div>
+    <div class="logo-text">ASTEROID</div>
+    <div class="logo-subtitle">Defense Command</div>
+  </div>
+
+  <div class="ready-section">
+    <div class="ready-text">ARE YOU READY?</div>
+    <div class="ready-subtitle">Prepare for battle</div>
+  </div>
+
   <button class="start-button" id="start-btn">START MISSION</button>
-  <div class="instruction-text">Move: Swipe/Arrow Keys • Shoot: Tap/Space</div>
+
+  <div class="feature-badges">
+    <div class="badge">🎮 Premium</div>
+    <div class="badge">⚡ Fast-Paced</div>
+    <div class="badge">🏆 Competitive</div>
+  </div>
+
+  <div class="instruction-text">Swipe or use arrow keys to move • Tap or press space to shoot</div>
 </div>
 
 <div id="game-container"></div>
@@ -639,18 +838,15 @@ function startGame() {
 }
 
 function initPhaserGame() {
-  // Responsive game size based on device
   const isMobile = window.innerWidth < 600;
   const isPortrait = window.innerHeight > window.innerWidth;
   
   let gameWidth, gameHeight;
   
   if (isMobile && isPortrait) {
-    // Portrait mobile (iPhone)
     gameWidth = Math.min(window.innerWidth, 400);
     gameHeight = Math.min(window.innerHeight * 0.7, 700);
   } else {
-    // Desktop or landscape
     gameWidth = Math.min(window.innerWidth * 0.9, 800);
     gameHeight = Math.min(window.innerHeight * 0.8, 500);
   }
