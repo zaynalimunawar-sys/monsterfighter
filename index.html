@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Tap Blast</title>
+  <title>Asteroid Defense</title>
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
   <style>
     :root {
@@ -13,7 +13,7 @@
     body {
       margin: 0;
       padding: 0;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: #0a0e27;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       overflow: hidden;
       user-select: none;
@@ -24,6 +24,7 @@
       display: block;
       margin: 0 auto;
       touch-action: none;
+      background: radial-gradient(ellipse at center, #1a1f3a 0%, #0a0e27 100%);
     }
 
     .hud {
@@ -32,9 +33,9 @@
       left: 0;
       right: 0;
       height: 80px;
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(10, 14, 39, 0.8);
       backdrop-filter: blur(20px);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      border-bottom: 2px solid rgba(100, 200, 255, 0.3);
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -42,39 +43,47 @@
       z-index: 100;
     }
 
-    .score-display {
+    .score-group {
+      display: flex;
+      gap: 30px;
+    }
+
+    .score-item {
+      text-align: left;
+    }
+
+    .score-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: rgba(100, 200, 255, 0.7);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .score-value {
       font-size: 28px;
       font-weight: 700;
-      color: #ffffff;
+      color: #64c8ff;
       font-family: monospace;
       letter-spacing: 2px;
     }
 
-    .combo-display {
-      background: rgba(255, 193, 7, 0.2);
-      border: 2px solid rgba(255, 193, 7, 0.6);
-      color: #ffc107;
-      padding: 8px 16px;
+    .wave-display {
+      background: rgba(100, 200, 255, 0.1);
+      border: 2px solid rgba(100, 200, 255, 0.4);
+      color: #64c8ff;
+      padding: 10px 20px;
       border-radius: 50px;
       font-weight: 700;
       font-size: 16px;
-    }
-
-    .timer-bar {
-      position: fixed;
-      bottom: var(--safe-area-bottom);
-      left: 0;
-      height: 6px;
-      background: linear-gradient(90deg, #4caf50, #ffc107, #ff6b6b);
-      z-index: 50;
-      transition: width 0.1s linear;
     }
 
     .modal {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.6);
+      background: rgba(0, 0, 0, 0.8);
       backdrop-filter: blur(8px);
       z-index: 200;
       align-items: center;
@@ -86,33 +95,40 @@
     }
 
     .modal-content {
-      background: rgba(255, 255, 255, 0.95);
+      background: rgba(10, 14, 39, 0.95);
       backdrop-filter: blur(20px);
       border-radius: 24px;
+      border: 2px solid rgba(100, 200, 255, 0.3);
       padding: 40px;
       text-align: center;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
     }
 
     .modal-title {
       font-size: 36px;
       font-weight: 700;
-      color: #333;
+      color: #64c8ff;
       margin: 0 0 20px 0;
     }
 
     .modal-score {
       font-size: 48px;
       font-weight: 700;
-      color: #667eea;
+      color: #ff6b9d;
       font-family: monospace;
-      margin: 0 0 30px 0;
+      margin: 0 0 10px 0;
       letter-spacing: 2px;
     }
 
+    .modal-wave {
+      font-size: 18px;
+      color: #64c8ff;
+      margin-bottom: 30px;
+    }
+
     .modal-button {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
+      background: linear-gradient(135deg, #64c8ff 0%, #00d4ff 100%);
+      color: #0a0e27;
       border: none;
       padding: 14px 40px;
       border-radius: 50px;
@@ -120,6 +136,7 @@
       font-weight: 600;
       cursor: pointer;
       transition: transform 0.2s;
+      margin-top: 20px;
     }
 
     .modal-button:active {
@@ -128,7 +145,8 @@
 
     @media (max-width: 600px) {
       .hud { height: 70px; padding: 0 16px; }
-      .score-display { font-size: 24px; }
+      .score-group { gap: 20px; }
+      .score-value { font-size: 24px; }
       .modal-content { padding: 30px; margin: 20px; }
       .modal-title { font-size: 28px; }
       .modal-score { font-size: 36px; }
@@ -139,16 +157,24 @@
 <body>
 
 <div class="hud">
-  <div class="score-display" id="score-text">0</div>
-  <div class="combo-display" id="combo-text">COMBO: 0</div>
+  <div class="score-group">
+    <div class="score-item">
+      <div class="score-label">Score</div>
+      <div class="score-value" id="score-text">0</div>
+    </div>
+    <div class="score-item">
+      <div class="score-label">Health</div>
+      <div class="score-value" id="health-text">3</div>
+    </div>
+  </div>
+  <div class="wave-display" id="wave-text">WAVE: 1</div>
 </div>
-
-<div class="timer-bar" id="timer-bar"></div>
 
 <div class="modal" id="game-over-modal">
   <div class="modal-content">
     <h1 class="modal-title">GAME OVER</h1>
     <div class="modal-score" id="modal-score">0</div>
+    <div class="modal-wave" id="modal-wave">Wave: 1</div>
     <button class="modal-button" onclick="location.reload()">Play Again</button>
   </div>
 </div>
@@ -158,167 +184,226 @@ const config = {
   type: Phaser.AUTO,
   width: 800,
   height: 400,
-  backgroundColor: "#e8e8e8",
+  backgroundColor: "#0a0e27",
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH
   },
   physics: {
     default: "arcade",
-    arcade: { debug: false }
+    arcade: {
+      gravity: { y: 600 },
+      debug: false
+    }
   },
   scene: { preload, create, update }
 };
 
 let game = new Phaser.Game(config);
 
+let player, asteroids, bullets, particles;
 let score = 0;
-let combo = 0;
-let timeLeft = 30000; // 30 seconds
-let gameStartTime = 0;
+let health = 3;
+let wave = 1;
 let isGameOver = false;
-let orbs;
-let particles;
-
-const orbColors = [0xff6b6b, 0x4ecdc4, 0xffd700, 0x667eea, 0x2ecc71];
+let spawnTimer = 0;
+let spawnRate = 2000;
+let bulletsGroup;
+let asteroidsGroup;
 
 function preload() {
   const g = this.add.graphics();
 
-  // Create orb textures (circles)
-  orbColors.forEach((color, idx) => {
-    g.fillStyle(color);
-    g.fillCircle(16, 16, 14);
-    g.fillStyle(0xffffff);
-    g.fillCircle(16, 16, 10);
-    g.generateTexture("orb" + idx, 32, 32);
-    g.clear();
-  });
+  // Player ship (triangle)
+  g.fillStyle(0x64c8ff);
+  g.beginPath();
+  g.moveTo(16, 0);
+  g.lineTo(0, 32);
+  g.lineTo(32, 32);
+  g.closePath();
+  g.fillPath();
+  g.generateTexture("player", 32, 32);
+  g.clear();
 
+  // Large asteroid
+  g.fillStyle(0xff8c42);
+  g.fillCircle(16, 16, 14);
+  g.lineStyle(2, 0xffaa55);
+  g.strokeCircle(16, 16, 14);
+  g.fillStyle(0xffaa55);
+  g.fillCircle(10, 10, 3);
+  g.fillCircle(22, 14, 3);
+  g.generateTexture("asteroid1", 32, 32);
+  g.clear();
+
+  // Medium asteroid
+  g.fillStyle(0xff8c42);
+  g.fillCircle(12, 12, 10);
+  g.lineStyle(2, 0xffaa55);
+  g.strokeCircle(12, 12, 10);
+  g.fillStyle(0xffaa55);
+  g.fillCircle(8, 8, 2);
+  g.generateTexture("asteroid2", 24, 24);
+  g.clear();
+
+  // Small asteroid
+  g.fillStyle(0xff8c42);
+  g.fillCircle(8, 8, 6);
+  g.lineStyle(1, 0xffaa55);
+  g.strokeCircle(8, 8, 6);
+  g.generateTexture("asteroid3", 16, 16);
+  g.clear();
+
+  // Bullet
+  g.fillStyle(0x64c8ff);
+  g.fillRect(0, 0, 4, 12);
+  g.generateTexture("bullet", 4, 12);
   g.destroy();
 }
 
 function create() {
-  gameStartTime = Date.now();
-  
-  // Orb group
-  orbs = this.physics.add.group();
-  particles = this.add.particles(0xffffff);
+  // Player
+  player = this.physics.add.sprite(400, 350, "player");
+  player.setCollideWorldBounds(true);
+  player.setImmovable(true);
 
-  // Spawn first orbs
-  for (let i = 0; i < 5; i++) {
-    spawnOrb.call(this);
-  }
+  // Groups
+  bulletsGroup = this.physics.add.group();
+  asteroidsGroup = this.physics.add.group();
+  particles = this.add.particles(0x64c8ff);
 
-  // Input
-  this.input.on("pointerdown", (pointer) => {
-    handleTap.call(this, pointer);
+  // Input: move ship with touch/mouse
+  this.input.on("pointermove", (pointer) => {
+    player.x = Phaser.Math.Clamp(pointer.x, 40, 760);
   });
 
-  // Update HUD
-  this.time.addEvent({
-    delay: 100,
-    callback: updateHUD,
-    loop: true
+  // Keyboard controls
+  this.input.keyboard.on("keydown-LEFT", () => {
+    player.x = Phaser.Math.Clamp(player.x - 20, 40, 760);
   });
+  this.input.keyboard.on("keydown-RIGHT", () => {
+    player.x = Phaser.Math.Clamp(player.x + 20, 40, 760);
+  });
+
+  // Shooting
+  this.input.on("pointerdown", shoot, this);
+  this.input.keyboard.on("keydown-SPACE", shoot, this);
+
+  // Collisions
+  this.physics.add.overlap(bulletsGroup, asteroidsGroup, hitAsteroid, null, this);
+  this.physics.add.overlap(player, asteroidsGroup, hitPlayer, null, this);
+
+  // Spawn first wave
+  spawnWave.call(this);
 }
 
 function update(time, delta) {
   if (isGameOver) return;
 
-  // Update time
-  timeLeft = 30000 - (Date.now() - gameStartTime);
-
-  if (timeLeft <= 0) {
-    endGame.call(this);
-    return;
+  // Spawn asteroids
+  spawnTimer += delta;
+  if (spawnTimer > spawnRate) {
+    spawnTimer = 0;
+    spawnAsteroid.call(this);
   }
 
-  // Update timer bar
-  const timerBar = document.getElementById("timer-bar");
-  timerBar.style.width = ((timeLeft / 30000) * 100) + "%";
+  // Increase difficulty
+  spawnRate = Math.max(1000 - wave * 100, 500);
 
-  // Move orbs with slight bounce
-  orbs.children.iterate(orb => {
-    if (!orb || !orb.active) return;
-    orb.y += Math.sin(time / 300 + orb.id) * 0.5;
-    orb.rotation += 0.02;
-
-    // Recycle if off screen
-    if (orb.y > 500) {
-      orb.destroy();
-      spawnOrb.call(this);
-    }
+  // Recycle bullets off-screen
+  bulletsGroup.children.iterate(bullet => {
+    if (bullet && bullet.y < -20) bullet.destroy();
   });
 
-  // Spawn new orbs randomly
-  if (Math.random() < 0.01) {
-    spawnOrb.call(this);
+  // Check if wave cleared
+  if (asteroidsGroup.countActive(true) === 0 && spawnTimer > 500) {
+    nextWave.call(this);
   }
+
+  // Update HUD
+  document.getElementById("score-text").textContent = score;
+  document.getElementById("health-text").textContent = health;
+  document.getElementById("wave-text").textContent = "WAVE: " + wave;
 }
 
-function spawnOrb() {
+function spawnAsteroid() {
   const x = Phaser.Math.Between(50, 750);
   const y = -40;
-  const colorIdx = Phaser.Math.Between(0, 4);
 
-  const orb = orbs.create(x, y, "orb" + colorIdx);
-  orb.id = colorIdx;
-  orb.setScale(1);
-  orb.setInteractive();
-  orb.on("pointerdown", () => {
-    if (isGameOver) return;
-    tapOrb.call(this, orb);
-  });
-
-  orb.body.setVelocityY(Phaser.Math.Between(100, 200));
+  const ast = asteroidsGroup.create(x, y, "asteroid1");
+  ast.setData("size", 1);
+  ast.body.setVelocity(Phaser.Math.Between(-100, 100), Phaser.Math.Between(150, 250));
+  ast.setBounce(0.3);
+  ast.body.setCollideWorldBounds(true);
+  ast.body.onWorldBounds = true;
 }
 
-function tapOrb(orb) {
-  if (!orb || !orb.active) return;
-
-  // Score boost based on combo
-  const points = 10 + combo * 5;
-  score += points;
-  combo++;
-
-  // Particle burst
-  particles.emitParticleAt(orb.x, orb.y, 10);
-
-  // Scale animation
-  this.tweens.add({
-    targets: orb,
-    scale: 1.3,
-    duration: 100
-  });
-
-  // Pop sound effect (visual feedback)
-  orb.setTint(0xffffff);
-  orb.destroy();
-
-  // Spawn 2 new orbs to keep density
-  spawnOrb.call(this);
-  spawnOrb.call(this);
-}
-
-function handleTap(pointer) {
-  // Check if tapped on an orb (handled by pointerdown event on orb)
-  // Reset combo if miss
-  if (combo > 0) {
-    setTimeout(() => {
-      if (combo > 0) combo = 0; // Reset if no tap for 1 second
-    }, 1000);
+function spawnWave() {
+  asteroidsGroup.clear(true, true);
+  spawnTimer = 0;
+  const count = 3 + wave * 2;
+  for (let i = 0; i < count; i++) {
+    this.time.delayedCall(i * 300, () => {
+      spawnAsteroid.call(this);
+    });
   }
 }
 
-function updateHUD() {
-  document.getElementById("score-text").textContent = score;
-  document.getElementById("combo-text").textContent = "COMBO: " + combo;
+function shoot() {
+  const bullet = bulletsGroup.create(player.x, player.y - 20, "bullet");
+  bullet.setVelocityY(-500);
+}
+
+function hitAsteroid(bullet, asteroid) {
+  const size = asteroid.getData("size");
+
+  // Remove bullet
+  bullet.destroy();
+
+  // Score based on size
+  score += (3 - size) * 10;
+
+  // Particle burst
+  particles.emitParticleAt(asteroid.x, asteroid.y, 15);
+
+  // Break into smaller asteroids
+  if (size < 3) {
+    for (let i = 0; i < 2; i++) {
+      const newAst = asteroidsGroup.create(
+        asteroid.x + Phaser.Math.Between(-20, 20),
+        asteroid.y + Phaser.Math.Between(-20, 20),
+        "asteroid" + (size + 1)
+      );
+      newAst.setData("size", size + 1);
+      newAst.body.setVelocity(
+        Phaser.Math.Between(-200, 200),
+        Phaser.Math.Between(-100, 100)
+      );
+      newAst.setBounce(0.5);
+    }
+  }
+
+  asteroid.destroy();
+}
+
+function hitPlayer(player, asteroid) {
+  health--;
+  asteroid.destroy();
+
+  if (health <= 0) {
+    endGame.call(this);
+  }
+}
+
+function nextWave() {
+  wave++;
+  spawnWave.call(this);
 }
 
 function endGame() {
   isGameOver = true;
   document.getElementById("modal-score").textContent = score;
+  document.getElementById("modal-wave").textContent = "Wave: " + wave;
   document.getElementById("game-over-modal").classList.add("active");
 }
 </script>
