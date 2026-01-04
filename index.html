@@ -1007,6 +1007,13 @@
   </div>
 </div>
 
+
+  <!-- THREAT LEVEL EXTREME -->
+  <div id="threat-indicator" style="position:fixed; top:160px; right:20px; background:rgba(255,0,0,0.9); padding:15px 25px; border-radius:15px; border:3px solid #FF0000; box-shadow:0 0 30px rgba(255,0,0,0.8); display:none; z-index:100;">
+    <div style="font-size:11px; color:#FFF; font-weight:800; letter-spacing:2px; margin-bottom:5px;">⚠️ THREAT LEVEL</div>
+    <div id="threat-level-text" style="font-size:32px; color:#FFD700; font-weight:900; text-shadow:0 0 10px #FF0000;">EXTREME</div>
+  </div>
+
 <div class="difficulty-indicator" id="difficulty-indicator">
   <div class="difficulty-label">⚠ THREAT LEVEL</div>
   <div class="difficulty-bar">
@@ -1637,6 +1644,38 @@ function createBossExplosion(x, y) {
 
   gameScene.cameras.main.shake(500, 0.01);
 }
+
+
+  function spawnEliteEnemy() {
+    if (!gameScene || isGameOver || bossActive) return;
+    const eliteType = Phaser.Math.Between(1, 3);
+    if (eliteType === 1) {
+      const elite = asteroidsGroup.create(Phaser.Math.Between(50, 750), -60, 'asteroid');
+      elite.setScale(2.5);
+      elite.body.setVelocity(Phaser.Math.Between(-150, 150), Phaser.Math.Between(250, 350));
+      elite.body.setAngularVelocity(Phaser.Math.Between(-200, 200));
+      elite.setData('hp', 5);
+      elite.setData('isElite', true);
+      elite.setTint(0xFF0000);
+      elite.setData('pattern', 'aggressive-chase');
+      elite.setData('swerveSpeed', 300);
+    } else if (eliteType === 2) {
+      const elite = cometsGroup.create(Phaser.Math.Between(50, 750), -60, 'comet');
+      elite.setScale(2);
+      elite.body.setVelocity(Phaser.Math.Between(-200, 200), Phaser.Math.Between(400, 500));
+      elite.setData('hp', 3);
+      elite.setData('isElite', true);
+      elite.setTint(0xFF6600);
+    } else {
+      const elite = debrisGroup.create(Phaser.Math.Between(50, 750), -60, 'debris');
+      elite.setScale(2);
+      elite.body.setVelocity(Phaser.Math.Between(-180, 180), Phaser.Math.Between(280, 380));
+      elite.setData('hp', 4);
+      elite.setData('isElite', true);
+      elite.setData('splits', true);
+      elite.setTint(0xFFD700);
+    }
+  }
 
 function update(time, delta) {
   if (isGameOver) return;
