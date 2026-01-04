@@ -1007,13 +1007,6 @@
   </div>
 </div>
 
-
-  <!-- THREAT LEVEL EXTREME -->
-  <div id="threat-indicator" style="position:fixed; top:160px; right:20px; background:rgba(255,0,0,0.9); padding:15px 25px; border-radius:15px; border:3px solid #FF0000; box-shadow:0 0 30px rgba(255,0,0,0.8); display:none; z-index:100;">
-    <div style="font-size:11px; color:#FFF; font-weight:800; letter-spacing:2px; margin-bottom:5px;">⚠️ THREAT LEVEL</div>
-    <div id="threat-level-text" style="font-size:32px; color:#FFD700; font-weight:900; text-shadow:0 0 10px #FF0000;">EXTREME</div>
-  </div>
-
 <div class="difficulty-indicator" id="difficulty-indicator">
   <div class="difficulty-label">⚠ THREAT LEVEL</div>
   <div class="difficulty-bar">
@@ -1489,6 +1482,10 @@ function create() {
 
   lastPlayerX = player.x;
 
+  
+  // Initialize colliders array
+  playerColliders = [];
+
   bulletsGroup = this.physics.add.group();
   asteroidsGroup = this.physics.add.group();
   cometsGroup = this.physics.add.group();
@@ -1645,38 +1642,6 @@ function createBossExplosion(x, y) {
   gameScene.cameras.main.shake(500, 0.01);
 }
 
-
-  function spawnEliteEnemy() {
-    if (!gameScene || isGameOver || bossActive) return;
-    const eliteType = Phaser.Math.Between(1, 3);
-    if (eliteType === 1) {
-      const elite = asteroidsGroup.create(Phaser.Math.Between(50, 750), -60, 'asteroid');
-      elite.setScale(2.5);
-      elite.body.setVelocity(Phaser.Math.Between(-150, 150), Phaser.Math.Between(250, 350));
-      elite.body.setAngularVelocity(Phaser.Math.Between(-200, 200));
-      elite.setData('hp', 5);
-      elite.setData('isElite', true);
-      elite.setTint(0xFF0000);
-      elite.setData('pattern', 'aggressive-chase');
-      elite.setData('swerveSpeed', 300);
-    } else if (eliteType === 2) {
-      const elite = cometsGroup.create(Phaser.Math.Between(50, 750), -60, 'comet');
-      elite.setScale(2);
-      elite.body.setVelocity(Phaser.Math.Between(-200, 200), Phaser.Math.Between(400, 500));
-      elite.setData('hp', 3);
-      elite.setData('isElite', true);
-      elite.setTint(0xFF6600);
-    } else {
-      const elite = debrisGroup.create(Phaser.Math.Between(50, 750), -60, 'debris');
-      elite.setScale(2);
-      elite.body.setVelocity(Phaser.Math.Between(-180, 180), Phaser.Math.Between(280, 380));
-      elite.setData('hp', 4);
-      elite.setData('isElite', true);
-      elite.setData('splits', true);
-      elite.setTint(0xFFD700);
-    }
-  }
-
 function update(time, delta) {
   if (isGameOver) return;
   if (!player || !player.active) return;
@@ -1700,7 +1665,15 @@ function update(time, delta) {
     spawnTimer += delta;
     if (spawnTimer >= spawnRate) {
       spawnTimer = 0;
-      spawnRandomEnemy.call(this);
+
+      // Burst spawning for wave 16+
+      let burstCount = wave >= 16 ? Math.min(6 + Math.floor((wave - 15) / 2), 15) : (wave >= 10 ? 2 : 1);
+
+      for (let i = 0; i < burstCount; i++) {
+        setTimeout(() => {
+          if (!isGameOver && !bossActive) spawnRandomEnemy.call(this);
+        }, i * 40);
+      }
     }
 
     healthSpawnTimer += delta;
@@ -2278,8 +2251,17 @@ function nextWave() {
 }
 
 function endGame() {
+  console.log("💀 endGame() called");
+
+  if (window.endGameRunning) {
+    console.log("⚠️ endGame already running");
+    return;
+  }
+  window.endGameRunning = true;
+
   isGameOver = true;
 
+  // Clean up
   asteroidsGroup.clear(true, true);
   cometsGroup.clear(true, true);
   debrisGroup.clear(true, true);
@@ -2288,19 +2270,95 @@ function endGame() {
   bossBulletsGroup.clear(true, true);
   healthPowerupsGroup.clear(true, true);
 
-  const isNewRecord = saveHighScore(score, playerUsername);
-
-  document.getElementById("modal-score").textContent = score;
-  document.getElementById("modal-wave").textContent = wave;
-  document.getElementById("modal-kills").textContent = kills;
-  document.getElementById("modal-bosses").textContent = bossesDefeated;
-
-  if (isNewRecord) {
-    document.getElementById("new-record-badge").classList.add("active");
+  // Pause scene
+  if (gameScene && gameScene.scene) {
+    gameScene.scene.pause();
+    console.log("⏸️ Scene paused");
   }
 
-  document.getElementById("game-over-modal").classList.add("active");
+  // Destroy player
+  if (player && player.active) {
+    player.destroy();
+    player = null;
+    console.log("🗑️ Player destroyed");
+  }
+
+  // Hide boss UI
+  document.getElementById('boss-health-container')?.classList.remove('active');
+  document.getElementById('boss-warning')?.classList.remove('active');
+
+  const isNewRecord = saveHighScore(score, playerUsername);
+  console.log("💾 Score saved. New record:", isNewRecord);
+
+  setTimeout(() => {
+    const modal = document.getElementById("game-over-modal");
+    const modalContent = modal?.querySelector('.modal-content');
+
+    // CRITICAL: Restore original modal HTML if it was changed
+    if (modalContent) {
+      const currentHTML = modalContent.innerHTML;
+      const isLevelComplete = currentHTML.includes('LEVEL') && currentHTML.includes('COMPLETE');
+
+      if (isLevelComplete) {
+        console.log("🔄 Modal shows level complete, restoring to mission failed");
+
+        if (window.originalModalHTML) {
+          modalContent.innerHTML = window.originalModalHTML;
+          console.log("✅ Original modal HTML restored");
+        } else {
+          console.error("❌ originalModalHTML not found! Reloading page...");
+          location.reload();
+          return;
+        }
+      } else {
+        console.log("✓ Modal already has correct structure");
+      }
+    }
+
+    // Update stats
+    const modalScore = document.getElementById("modal-score");
+    const modalWave = document.getElementById("modal-wave");
+    const modalKills = document.getElementById("modal-kills");
+    const modalBosses = document.getElementById("modal-bosses");
+    const recordBadge = document.getElementById("new-record-badge");
+
+    if (modalScore) modalScore.textContent = score;
+    if (modalWave) modalWave.textContent = wave;
+    if (modalKills) modalKills.textContent = kills;
+    if (modalBosses) modalBosses.textContent = bossesDefeated;
+
+    if (recordBadge) {
+      if (isNewRecord) {
+        recordBadge.classList.add("active");
+      } else {
+        recordBadge.classList.remove("active");
+      }
+    }
+
+    // Show modal
+    if (modal) {
+      modal.classList.add("active");
+      modal.style.display = "flex";
+      console.log("✅ MISSION FAILED modal shown");
+    }
+
+    window.endGameRunning = false;
+  }, 200);
 }
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+  // Save original modal HTML
+  const modal = document.getElementById('game-over-modal');
+  const modalContent = modal?.querySelector('.modal-content');
+  if (modalContent) {
+    window.originalModalHTML = modalContent.innerHTML;
+    console.log('💾 Original modal HTML saved:', window.originalModalHTML.substring(0, 100) + '...');
+  } else {
+    console.error('❌ Could not find modal content to save!');
+  }
+});
+
 </script>
 
 </body>
