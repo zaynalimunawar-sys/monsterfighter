@@ -14,8 +14,10 @@
       --ubi-blue: #0099FF;
       --ubi-yellow: #FFD700;
       --ubi-red: #FF0033;
+      --ubi-green: #00FF66;
       --orange-glow: rgba(255, 102, 0, 0.4);
       --blue-glow: rgba(0, 153, 255, 0.4);
+      --green-glow: rgba(0, 255, 102, 0.4);
     }
 
     * {
@@ -139,6 +141,17 @@
       50% { 
         opacity: 0.7;
         transform: scale(1.05);
+      }
+    }
+
+    @keyframes healthPulse {
+      0%, 100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 20px var(--green-glow));
+      }
+      50% {
+        transform: scale(1.15);
+        filter: drop-shadow(0 0 40px var(--green-glow));
       }
     }
 
@@ -396,6 +409,12 @@
       text-transform: uppercase;
       letter-spacing: 1px;
       font-weight: 700;
+    }
+
+    .badge.green {
+      background: rgba(0, 255, 102, 0.1);
+      border-color: rgba(0, 255, 102, 0.3);
+      color: var(--ubi-green);
     }
 
     #game-container {
@@ -849,11 +868,11 @@
 
   <div class="feature-badges">
     <div class="badge">🎮 Zaynisoft Edition</div>
-    <div class="badge">💥 Boss Attacks</div>
-    <div class="badge">🚀 Epic Combat</div>
+    <div class="badge">💥 Scaling Bosses</div>
+    <div class="badge green">💚 Health Powerups</div>
   </div>
 
-  <div class="instruction-text">Boss every 1000 points!<br>Dodge boss bullets!<br><br>🚀 READY FOR BATTLE!</div>
+  <div class="instruction-text">Boss every 1000 points!<br>Full heal on boss spawn/defeat!<br>Catch green comets for +1 life!<br>Bosses get stronger each time!<br><br>🚀 READY FOR BATTLE!</div>
 </div>
 
 <div id="game-container"></div>
@@ -881,7 +900,7 @@
 </div>
 
 <div class="boss-health-container" id="boss-health-container">
-  <div class="boss-label">⚠ BOSS SHIP ⚠</div>
+  <div class="boss-label" id="boss-label-text">⚠ BOSS SHIP ⚠</div>
   <div class="boss-health-bar-bg">
     <div class="boss-health-bar">
       <div class="boss-health-fill" id="boss-health-fill" style="width: 100%"></div>
@@ -1050,6 +1069,25 @@ function playBossShoot() {
   oscillator.stop(audioCtx.currentTime + 0.05);
 }
 
+function playHealthPickup() {
+  if (!audioCtx) return;
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  oscillator.type = 'sine';
+  oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.2);
+
+  gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+
+  oscillator.start(audioCtx.currentTime);
+  oscillator.stop(audioCtx.currentTime + 0.2);
+}
+
 document.getElementById('start-btn').addEventListener('click', startGame);
 
 function startGame() {
@@ -1118,7 +1156,7 @@ let spawnTimer = 0;
 let spawnRate = 2000;
 let fireTimer = 0;
 let fireRate = 100;
-let bulletsGroup, asteroidsGroup, cometsGroup, debrisGroup, bossGroup, bossBulletsGroup;
+let bulletsGroup, asteroidsGroup, cometsGroup, debrisGroup, bossGroup, bossBulletsGroup, healthPowerupsGroup;
 let isInvulnerable = false;
 let baseSpeed = 80;
 let speedIncrement = 0;
@@ -1129,9 +1167,11 @@ let playerColliders = [];
 let boss = null;
 let bossActive = false;
 let lastBossScore = 0;
-let nextBossScore = 1000; // CHANGED FROM 500 TO 1000!
+let nextBossScore = 1000;
 let particlesGroup;
 let bossShootTimer = 0;
+let healthSpawnTimer = 0;
+let currentBossLevel = 1;
 
 function preload() {
   const g = this.add.graphics();
@@ -1181,6 +1221,30 @@ function preload() {
   g.fillRect(2, 2, 8, 8);
   g.fillRect(15, 15, 8, 8);
   g.generateTexture("debris", 25, 25);
+  g.clear();
+
+  g.fillStyle(0x00FF66);
+  g.fillCircle(18, 18, 16);
+  g.lineStyle(4, 0x00CC55);
+  g.strokeCircle(18, 18, 16);
+  g.fillStyle(0xFFFFFF);
+  g.fillCircle(18, 18, 10);
+  g.fillStyle(0x00FF66);
+  g.beginPath();
+  g.moveTo(18, 8);
+  g.lineTo(14, 18);
+  g.lineTo(18, 16);
+  g.lineTo(22, 18);
+  g.closePath();
+  g.fillPath();
+  g.beginPath();
+  g.moveTo(18, 28);
+  g.lineTo(14, 18);
+  g.lineTo(18, 20);
+  g.lineTo(22, 18);
+  g.closePath();
+  g.fillPath();
+  g.generateTexture("healthPowerup", 36, 36);
   g.clear();
 
   g.fillStyle(0xFF0033);
@@ -1246,6 +1310,7 @@ function create() {
   bossGroup = this.physics.add.group();
   bossBulletsGroup = this.physics.add.group();
   particlesGroup = this.physics.add.group();
+  healthPowerupsGroup = this.physics.add.group();
 
   this.input.on("pointermove", (pointer) => {
     if (!isGameOver && player && player.active) {
@@ -1276,8 +1341,77 @@ function create() {
   playerColliders.push(this.physics.add.overlap(player, debrisGroup, hitPlayer, null, this));
   playerColliders.push(this.physics.add.overlap(player, bossGroup, hitPlayer, null, this));
   playerColliders.push(this.physics.add.overlap(player, bossBulletsGroup, hitPlayerByBossBullet, null, this));
+  playerColliders.push(this.physics.add.overlap(player, healthPowerupsGroup, collectHealth, null, this));
 
   spawnWave.call(this);
+}
+
+function restoreFullHealth() {
+  health = 3;
+  const hearts = document.querySelectorAll(".heart");
+  hearts.forEach(heart => heart.classList.remove("lost"));
+}
+
+function updateHeartsDisplay() {
+  const hearts = document.querySelectorAll(".heart");
+  hearts.forEach((heart, index) => {
+    if (index >= health) {
+      heart.classList.add("lost");
+    } else {
+      heart.classList.remove("lost");
+    }
+  });
+}
+
+function collectHealth(playerObj, healthPowerup) {
+  if (!healthPowerup || !healthPowerup.active) return;
+
+  const hx = healthPowerup.x;
+  const hy = healthPowerup.y;
+
+  healthPowerup.destroy();
+
+  createExplosion(hx, hy, 0x00FF66, 12);
+  playHealthPickup();
+
+  if (health < 3) {
+    health++;
+    updateHeartsDisplay();
+  }
+}
+
+function spawnHealthPowerup() {
+  if (!gameScene || isGameOver || bossActive) return;
+
+  const x = Phaser.Math.Between(80, gameScene.sys.canvas.width - 80);
+  const healthPowerup = healthPowerupsGroup.create(x, -20, "healthPowerup");
+  if (!healthPowerup) return;
+
+  healthPowerup.body.setVelocityY(120);
+  healthPowerup.setCircle(16, 2, 2);
+  healthPowerup.setScale(0.5);
+
+  gameScene.tweens.add({ 
+    targets: healthPowerup, 
+    scale: 1, 
+    duration: 400, 
+    ease: 'Back.easeOut' 
+  });
+
+  gameScene.tweens.add({ 
+    targets: healthPowerup, 
+    alpha: { from: 1, to: 0.7 }, 
+    duration: 400, 
+    yoyo: true, 
+    repeat: -1 
+  });
+
+  gameScene.tweens.add({ 
+    targets: healthPowerup, 
+    angle: 360, 
+    duration: 2000, 
+    repeat: -1 
+  });
 }
 
 function createExplosion(x, y, color = 0xFF6600, particleCount = 12) {
@@ -1350,11 +1484,20 @@ function update(time, delta) {
       spawnTimer = 0;
       spawnRandomEnemy.call(this);
     }
+
+    healthSpawnTimer += delta;
+    if (healthSpawnTimer >= 15000) {
+      healthSpawnTimer = 0;
+      if (Math.random() < 0.3) {
+        spawnHealthPowerup();
+      }
+    }
   }
 
   if (boss && boss.active && bossActive) {
     bossShootTimer += delta;
-    if (bossShootTimer >= 800) {
+    const fireRate = boss.getData('fireRate') || 800;
+    if (bossShootTimer >= fireRate) {
       bossShootTimer = 0;
       bossShoot();
     }
@@ -1390,11 +1533,18 @@ function update(time, delta) {
     });
   });
 
+  healthPowerupsGroup.children.entries.forEach(hp => {
+    if (hp && hp.active && hp.y > this.sys.canvas.height + 30) {
+      hp.destroy();
+    }
+  });
+
   if (boss && boss.active) {
     const bossTime = boss.getData('moveTime') + delta;
     boss.setData('moveTime', bossTime);
 
-    const moveX = Math.sin(bossTime / 800) * 120;
+    const moveSpeed = boss.getData('moveSpeed') || 120;
+    const moveX = Math.sin(bossTime / 800) * moveSpeed;
     boss.body.setVelocityX(moveX);
 
     if (boss.y < 100) {
@@ -1436,7 +1586,18 @@ function bossShoot() {
 
   playBossShoot();
 
-  const angles = [-15, 0, 15];
+  const bulletCount = boss.getData('bulletCount') || 3;
+  const spreadAngle = boss.getData('spreadAngle') || 15;
+
+  const angles = [];
+  if (bulletCount === 1) {
+    angles.push(0);
+  } else {
+    for (let i = 0; i < bulletCount; i++) {
+      const offset = (i - (bulletCount - 1) / 2) * spreadAngle;
+      angles.push(offset);
+    }
+  }
 
   angles.forEach(angleOffset => {
     const bullet = bossBulletsGroup.create(boss.x, boss.y + 60, "bossBullet");
@@ -1445,7 +1606,7 @@ function bossShoot() {
     const angleToPlayer = Phaser.Math.Angle.Between(boss.x, boss.y, player.x, player.y);
     const finalAngle = angleToPlayer + (angleOffset * Math.PI / 180);
 
-    const speed = 300;
+    const speed = boss.getData('bulletSpeed') || 300;
     bullet.body.setVelocity(
       Math.cos(finalAngle) * speed,
       Math.sin(finalAngle) * speed
@@ -1461,6 +1622,9 @@ function spawnBoss() {
   asteroidsGroup.clear(true, true);
   cometsGroup.clear(true, true);
   debrisGroup.clear(true, true);
+  healthPowerupsGroup.clear(true, true);
+
+  restoreFullHealth();
 
   bossActive = true;
   bossShootTimer = 0;
@@ -1482,9 +1646,61 @@ function spawnBoss() {
 
     boss.setScale(0.6);
     boss.body.setSize(140, 100);
-    boss.setData('hp', 50);
-    boss.setData('maxHp', 50);
+
+    const baseHP = 30;
+    const hpIncrease = (currentBossLevel - 1) * 15;
+    const bossHP = baseHP + hpIncrease;
+
+    boss.setData('hp', bossHP);
+    boss.setData('maxHp', bossHP);
     boss.setData('moveTime', 0);
+    boss.setData('level', currentBossLevel);
+
+    if (currentBossLevel === 1) {
+      boss.setData('fireRate', 1200);
+      boss.setData('bulletCount', 1);
+      boss.setData('spreadAngle', 0);
+      boss.setData('bulletSpeed', 250);
+      boss.setData('moveSpeed', 100);
+    } else if (currentBossLevel === 2) {
+      boss.setData('fireRate', 1000);
+      boss.setData('bulletCount', 3);
+      boss.setData('spreadAngle', 12);
+      boss.setData('bulletSpeed', 280);
+      boss.setData('moveSpeed', 120);
+    } else if (currentBossLevel === 3) {
+      boss.setData('fireRate', 850);
+      boss.setData('bulletCount', 3);
+      boss.setData('spreadAngle', 15);
+      boss.setData('bulletSpeed', 300);
+      boss.setData('moveSpeed', 130);
+    } else if (currentBossLevel === 4) {
+      boss.setData('fireRate', 700);
+      boss.setData('bulletCount', 5);
+      boss.setData('spreadAngle', 12);
+      boss.setData('bulletSpeed', 320);
+      boss.setData('moveSpeed', 140);
+    } else {
+      boss.setData('fireRate', Math.max(500, 700 - (currentBossLevel - 4) * 30));
+      boss.setData('bulletCount', 5);
+      boss.setData('spreadAngle', Math.min(18, 12 + (currentBossLevel - 4) * 1));
+      boss.setData('bulletSpeed', Math.min(380, 320 + (currentBossLevel - 4) * 10));
+      boss.setData('moveSpeed', Math.min(160, 140 + (currentBossLevel - 4) * 4));
+    }
+
+    let levelLabel = '';
+    if (currentBossLevel === 1) {
+      levelLabel = '⚠ BOSS SHIP LV1 ⚠';
+    } else if (currentBossLevel === 2) {
+      levelLabel = '⚠ BOSS SHIP LV2 ⚠';
+    } else if (currentBossLevel === 3) {
+      levelLabel = '⚠ BOSS SHIP LV3 ⚠';
+    } else if (currentBossLevel === 4) {
+      levelLabel = '⚠ BOSS SHIP LV4 ⚠';
+    } else {
+      levelLabel = '⚠ BOSS SHIP LV' + currentBossLevel + ' ⚠';
+    }
+    document.getElementById('boss-label-text').textContent = levelLabel;
 
     document.getElementById('boss-health-container').classList.add('active');
     updateBossHealth();
@@ -1528,8 +1744,11 @@ function hitBoss(bullet, bossObj) {
     boss = null;
     bossActive = false;
     bossesDefeated++;
-    score += 200;
-    nextBossScore = score + 1000; // CHANGED FROM 500 TO 1000!
+    currentBossLevel++;
+    score += 100;
+    nextBossScore = score + 1000;
+
+    restoreFullHealth();
 
     document.getElementById('boss-health-container').classList.remove('active');
 
@@ -1540,7 +1759,7 @@ function hitBoss(bullet, bossObj) {
     gameScene.time.delayedCall(50, () => {
       if (bossObj && bossObj.active) bossObj.clearTint();
     });
-    score += 5;
+    score += 2;
   }
 }
 
@@ -1553,11 +1772,7 @@ function hitPlayerByBossBullet(playerObj, bullet) {
   health--;
   playHit();
 
-  const hearts = document.querySelectorAll(".heart");
-  const heartIndex = 2 - health;
-  if (hearts[heartIndex]) {
-    hearts[heartIndex].classList.add("lost");
-  }
+  updateHeartsDisplay();
 
   isInvulnerable = true;
   let flashCount = 0;
@@ -1740,7 +1955,7 @@ function hitEnemy(bullet, enemy) {
 
   shotsHit++;
   kills++;
-  score += 10;
+  score += 5;
 }
 
 function hitComet(bullet, comet) {
@@ -1759,7 +1974,7 @@ function hitComet(bullet, comet) {
 
     shotsHit++;
     kills++;
-    score += 25;
+    score += 15;
   } else {
     comet.setData('hp', hp - 1);
     comet.setTint(0xff6666);
@@ -1768,7 +1983,7 @@ function hitComet(bullet, comet) {
       if (comet && comet.active) comet.clearTint();
     });
     shotsHit++;
-    score += 5;
+    score += 3;
   }
 }
 
@@ -1786,7 +2001,7 @@ function hitDebris(bullet, debris) {
 
   shotsHit++;
   kills++;
-  score += 5;
+  score += 3;
 }
 
 function hitPlayer(playerObj, enemy) {
@@ -1798,11 +2013,7 @@ function hitPlayer(playerObj, enemy) {
   health--;
   playHit();
 
-  const hearts = document.querySelectorAll(".heart");
-  const heartIndex = 2 - health;
-  if (hearts[heartIndex]) {
-    hearts[heartIndex].classList.add("lost");
-  }
+  updateHeartsDisplay();
 
   isInvulnerable = true;
   let flashCount = 0;
@@ -1853,6 +2064,7 @@ function endGame() {
   bossGroup.clear(true, true);
   bulletsGroup.clear(true, true);
   bossBulletsGroup.clear(true, true);
+  healthPowerupsGroup.clear(true, true);
 
   document.getElementById("modal-score").textContent = score;
   document.getElementById("modal-wave").textContent = wave;
