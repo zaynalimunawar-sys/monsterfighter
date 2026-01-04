@@ -144,14 +144,14 @@
       }
     }
 
-    @keyframes healthPulse {
+    @keyframes newRecordFlash {
       0%, 100% {
+        opacity: 1;
         transform: scale(1);
-        filter: drop-shadow(0 0 20px var(--green-glow));
       }
       50% {
-        transform: scale(1.15);
-        filter: drop-shadow(0 0 40px var(--green-glow));
+        opacity: 0.8;
+        transform: scale(1.1);
       }
     }
 
@@ -276,7 +276,7 @@
 
     .logo-container {
       text-align: center;
-      margin-bottom: 40px;
+      margin-bottom: 30px;
     }
 
     .logo-icon {
@@ -308,9 +308,81 @@
       margin-bottom: 16px;
     }
 
+    .highscore-display {
+      background: rgba(10, 14, 39, 0.8);
+      border: 2px solid rgba(255, 215, 0, 0.4);
+      border-radius: 16px;
+      padding: 12px 24px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .highscore-label {
+      font-size: 10px;
+      color: rgba(255, 215, 0, 0.6);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 4px;
+    }
+
+    .highscore-value {
+      font-size: 32px;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--ubi-yellow) 0%, var(--ubi-orange) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-family: "SF Mono", monospace;
+      letter-spacing: -1px;
+    }
+
+    .highscore-player {
+      font-size: 14px;
+      color: var(--ubi-blue);
+      margin-top: 4px;
+      font-weight: 700;
+    }
+
+    .username-section {
+      margin-bottom: 30px;
+      text-align: center;
+    }
+
+    .username-label {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+
+    .username-input {
+      background: rgba(10, 14, 39, 0.9);
+      border: 2px solid rgba(0, 153, 255, 0.4);
+      border-radius: 12px;
+      padding: 12px 20px;
+      font-size: 18px;
+      font-weight: 700;
+      color: white;
+      text-align: center;
+      width: 280px;
+      max-width: 90%;
+      font-family: inherit;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+
+    .username-input:focus {
+      border-color: var(--ubi-orange);
+      box-shadow: 0 0 20px var(--orange-glow);
+    }
+
+    .username-input::placeholder {
+      color: rgba(255, 255, 255, 0.3);
+    }
+
     .ready-section {
       text-align: center;
-      margin-bottom: 40px;
+      margin-bottom: 30px;
     }
 
     .ready-text {
@@ -381,7 +453,7 @@
     }
 
     .instruction-text {
-      margin-top: 30px;
+      margin-top: 20px;
       font-size: 11px;
       color: rgba(255, 255, 255, 0.4);
       text-transform: uppercase;
@@ -394,7 +466,7 @@
     .feature-badges {
       display: flex;
       gap: 12px;
-      margin-top: 24px;
+      margin-top: 20px;
       justify-content: center;
       flex-wrap: wrap;
     }
@@ -744,6 +816,26 @@
       text-transform: uppercase;
     }
 
+    .new-record-badge {
+      display: none;
+      background: linear-gradient(135deg, var(--ubi-yellow) 0%, var(--ubi-orange) 100%);
+      color: #000;
+      font-size: 14px;
+      font-weight: 900;
+      padding: 8px 20px;
+      border-radius: 20px;
+      margin: 0 auto 16px;
+      width: fit-content;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      animation: newRecordFlash 1s ease-in-out infinite;
+      box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+    }
+
+    .new-record-badge.active {
+      display: block;
+    }
+
     .modal-score {
       font-size: 56px;
       font-weight: 900;
@@ -835,6 +927,7 @@
       .boss-label { font-size: 20px; }
       .boss-health-bar { height: 24px; }
       .boss-warning { font-size: 80px; padding: 40px 30px; }
+      .highscore-value { font-size: 40px; }
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.85.0/dist/phaser.js"></script>
@@ -857,9 +950,15 @@
     <div class="logo-subtitle">Defense Protocol</div>
   </div>
 
-  <div class="ready-section">
-    <div class="ready-text">ASTEROID DEFENSE<br>PROTOCOL</div>
-    <div class="ready-subtitle">Are You Ready?</div>
+  <div class="highscore-display" id="highscore-display">
+    <div class="highscore-label">🏆 High Score</div>
+    <div class="highscore-value" id="highscore-value">0</div>
+    <div class="highscore-player" id="highscore-player">-</div>
+  </div>
+
+  <div class="username-section">
+    <div class="username-label">Enter Callsign</div>
+    <input type="text" class="username-input" id="username-input" placeholder="PILOT" maxlength="12" />
   </div>
 
   <div class="button-container">
@@ -872,7 +971,7 @@
     <div class="badge green">💚 Health Powerups</div>
   </div>
 
-  <div class="instruction-text">Boss every 1000 points!<br>Full heal on boss spawn/defeat!<br>Catch green comets for +1 life!<br>Bosses get stronger each time!<br><br>🚀 READY FOR BATTLE!</div>
+  <div class="instruction-text">Boss every 1000 points!<br>Full heal on boss spawn/defeat!<br>Bosses get stronger each time!<br><br>🚀 READY FOR BATTLE!</div>
 </div>
 
 <div id="game-container"></div>
@@ -918,6 +1017,7 @@
 <div class="modal" id="game-over-modal">
   <div class="modal-content">
     <h1 class="modal-title">⚠ MISSION FAILED</h1>
+    <div class="new-record-badge" id="new-record-badge">🏆 NEW HIGH SCORE! 🏆</div>
     <div class="modal-score" id="modal-score">0</div>
     <div class="modal-stats">
       <div class="modal-stat">
@@ -942,6 +1042,7 @@
 <script>
 let gameStarted = false;
 let phaserGame;
+let playerUsername = "";
 
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
@@ -950,6 +1051,29 @@ function initAudio() {
   if (!audioCtx) {
     audioCtx = new AudioContext();
   }
+}
+
+function loadHighScore() {
+  const savedScore = localStorage.getItem('asteroidDefenseHighScore');
+  const savedPlayer = localStorage.getItem('asteroidDefenseHighScorePlayer');
+
+  if (savedScore) {
+    document.getElementById('highscore-value').textContent = savedScore;
+    document.getElementById('highscore-player').textContent = savedPlayer || 'PILOT';
+  } else {
+    document.getElementById('highscore-value').textContent = '0';
+    document.getElementById('highscore-player').textContent = '-';
+  }
+}
+
+function saveHighScore(score, player) {
+  const currentHigh = parseInt(localStorage.getItem('asteroidDefenseHighScore') || '0');
+  if (score > currentHigh) {
+    localStorage.setItem('asteroidDefenseHighScore', score.toString());
+    localStorage.setItem('asteroidDefenseHighScorePlayer', player);
+    return true;
+  }
+  return false;
 }
 
 function playShoot() {
@@ -1088,10 +1212,21 @@ function playHealthPickup() {
   oscillator.stop(audioCtx.currentTime + 0.2);
 }
 
+loadHighScore();
+
 document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('username-input').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    startGame();
+  }
+});
 
 function startGame() {
   if (gameStarted) return;
+
+  const usernameInput = document.getElementById('username-input').value.trim();
+  playerUsername = usernameInput || 'PILOT';
+
   gameStarted = true;
 
   initAudio();
@@ -2066,10 +2201,17 @@ function endGame() {
   bossBulletsGroup.clear(true, true);
   healthPowerupsGroup.clear(true, true);
 
+  const isNewRecord = saveHighScore(score, playerUsername);
+
   document.getElementById("modal-score").textContent = score;
   document.getElementById("modal-wave").textContent = wave;
   document.getElementById("modal-kills").textContent = kills;
   document.getElementById("modal-bosses").textContent = bossesDefeated;
+
+  if (isNewRecord) {
+    document.getElementById("new-record-badge").classList.add("active");
+  }
+
   document.getElementById("game-over-modal").classList.add("active");
 }
 </script>
