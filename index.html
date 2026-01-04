@@ -131,6 +131,17 @@
       50%, 100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
     }
 
+    @keyframes bossWarningPulse {
+      0%, 100% { 
+        opacity: 1;
+        transform: scale(1);
+      }
+      50% { 
+        opacity: 0.7;
+        transform: scale(1.05);
+      }
+    }
+
     html, body {
       width: 100%;
       height: 100%;
@@ -290,21 +301,24 @@
     }
 
     .ready-text {
-      font-size: 36px;
+      font-size: 28px;
       font-weight: 800;
       color: var(--ubi-orange);
       text-transform: uppercase;
-      letter-spacing: 6px;
+      letter-spacing: 4px;
       margin-bottom: 12px;
       animation: floatText 3s ease-in-out infinite;
       font-family: 'Arial Black', sans-serif;
+      line-height: 1.4;
     }
 
     .ready-subtitle {
-      font-size: 14px;
-      color: rgba(255, 255, 255, 0.5);
-      letter-spacing: 2px;
+      font-size: 18px;
+      color: #0099FF;
+      letter-spacing: 3px;
       text-transform: uppercase;
+      font-weight: 700;
+      text-shadow: 0 0 20px var(--blue-glow);
     }
 
     .start-button {
@@ -469,13 +483,6 @@
       line-height: 1;
     }
 
-    .multiplier {
-      font-size: 11px;
-      color: var(--ubi-yellow);
-      font-weight: 700;
-      margin-top: 2px;
-    }
-
     .health-card {
       display: flex;
       flex-direction: column;
@@ -534,6 +541,87 @@
       box-shadow: 
         0 0 20px var(--orange-glow),
         inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+
+    .boss-health-container {
+      position: fixed;
+      top: max(calc(var(--safe-area-top) + 80px), 80px);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      width: 90%;
+      max-width: 400px;
+      display: none;
+    }
+
+    .boss-health-container.active {
+      display: block;
+    }
+
+    .boss-label {
+      text-align: center;
+      font-size: 16px;
+      font-weight: 900;
+      color: var(--ubi-red);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      margin-bottom: 8px;
+      text-shadow: 0 0 20px rgba(255, 0, 51, 0.8);
+      animation: bossWarningPulse 1s ease-in-out infinite;
+    }
+
+    .boss-health-bar-bg {
+      background: rgba(10, 14, 39, 0.9);
+      border: 3px solid var(--ubi-red);
+      border-radius: 20px;
+      padding: 8px;
+      box-shadow: 0 0 30px rgba(255, 0, 51, 0.5);
+    }
+
+    .boss-health-bar {
+      height: 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .boss-health-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--ubi-red), var(--ubi-orange), var(--ubi-yellow));
+      border-radius: 12px;
+      transition: width 0.3s ease;
+      box-shadow: 0 0 20px rgba(255, 102, 0, 0.8);
+    }
+
+    .boss-warning {
+      position: fixed;
+      top: 50%;
+      left: 0;
+      right: 0;
+      transform: translateY(-50%);
+      z-index: 150;
+      text-align: center;
+      font-size: 64px;
+      font-weight: 900;
+      color: var(--ubi-red);
+      text-transform: uppercase;
+      letter-spacing: 12px;
+      text-shadow: 
+        0 0 40px rgba(255, 0, 51, 0.8),
+        0 0 80px rgba(255, 0, 51, 0.6),
+        0 4px 8px rgba(0, 0, 0, 0.8);
+      animation: bossWarningPulse 0.6s ease-in-out;
+      pointer-events: none;
+      display: none;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 30px 20px;
+      border-top: 4px solid var(--ubi-red);
+      border-bottom: 4px solid var(--ubi-red);
+    }
+
+    .boss-warning.active {
+      display: block;
     }
 
     .difficulty-indicator {
@@ -706,8 +794,8 @@
       .logo-icon { font-size: 120px; }
       .logo-text { font-size: 64px; letter-spacing: 12px; }
       .logo-subtitle { font-size: 18px; letter-spacing: 6px; }
-      .ready-text { font-size: 48px; letter-spacing: 8px; }
-      .ready-subtitle { font-size: 16px; }
+      .ready-text { font-size: 32px; letter-spacing: 5px; }
+      .ready-subtitle { font-size: 22px; letter-spacing: 4px; }
       .start-button { padding: 22px 70px; font-size: 24px; }
       .instruction-text { font-size: 14px; }
       .hud { top: calc(var(--safe-area-top) + 24px); left: 24px; right: 24px; gap: 16px; }
@@ -725,6 +813,9 @@
       .modal-score { font-size: 80px; }
       .modal-stat-value { font-size: 28px; }
       .zayni-logo { font-size: 24px; }
+      .boss-label { font-size: 20px; }
+      .boss-health-bar { height: 24px; }
+      .boss-warning { font-size: 80px; padding: 40px 30px; }
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.85.0/dist/phaser.js"></script>
@@ -748,8 +839,8 @@
   </div>
 
   <div class="ready-section">
-    <div class="ready-text">PROGRESSIVE MODE</div>
-    <div class="ready-subtitle">Difficulty escalates over time</div>
+    <div class="ready-text">ASTEROID DEFENSE<br>PROTOCOL</div>
+    <div class="ready-subtitle">Are You Ready?</div>
   </div>
 
   <div class="button-container">
@@ -758,14 +849,16 @@
 
   <div class="feature-badges">
     <div class="badge">🎮 Zaynisoft Edition</div>
-    <div class="badge">☄️ Progressive Waves</div>
-    <div class="badge">💀 Elite Difficulty</div>
+    <div class="badge">💥 Boss Attacks</div>
+    <div class="badge">🚀 Epic Combat</div>
   </div>
 
-  <div class="instruction-text">Waves 1-3: Asteroids Only<br>Waves 4-7: + Comets<br>Wave 8+: Full Threat Mode<br><br>⬢ Auto-fires continuously!</div>
+  <div class="instruction-text">Boss every 1000 points!<br>Dodge boss bullets!<br><br>🚀 READY FOR BATTLE!</div>
 </div>
 
 <div id="game-container"></div>
+
+<div class="boss-warning" id="boss-warning">⚠ BOSS INCOMING ⚠</div>
 
 <div class="hud" id="hud">
   <div class="glass-card score-card">
@@ -785,6 +878,15 @@
   </div>
 
   <div class="glass-card wave-badge" id="wave-text">WAVE 1</div>
+</div>
+
+<div class="boss-health-container" id="boss-health-container">
+  <div class="boss-label">⚠ BOSS SHIP ⚠</div>
+  <div class="boss-health-bar-bg">
+    <div class="boss-health-bar">
+      <div class="boss-health-fill" id="boss-health-fill" style="width: 100%"></div>
+    </div>
+  </div>
 </div>
 
 <div class="difficulty-indicator" id="difficulty-indicator">
@@ -808,8 +910,8 @@
         <div class="modal-stat-value" id="modal-kills">0</div>
       </div>
       <div class="modal-stat">
-        <div class="modal-stat-label">Accuracy</div>
-        <div class="modal-stat-value" id="modal-accuracy">0%</div>
+        <div class="modal-stat-label">Bosses Defeated</div>
+        <div class="modal-stat-value" id="modal-bosses">0</div>
       </div>
     </div>
     <div class="modal-buttons">
@@ -822,11 +924,139 @@
 let gameStarted = false;
 let phaserGame;
 
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new AudioContext();
+  }
+}
+
+function playShoot() {
+  if (!audioCtx) return;
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.03);
+
+  gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.03);
+
+  oscillator.start(audioCtx.currentTime);
+  oscillator.stop(audioCtx.currentTime + 0.03);
+}
+
+function playExplosion() {
+  if (!audioCtx) return;
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  oscillator.type = 'sawtooth';
+  oscillator.frequency.setValueAtTime(120, audioCtx.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.15);
+
+  gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+
+  oscillator.start(audioCtx.currentTime);
+  oscillator.stop(audioCtx.currentTime + 0.15);
+}
+
+function playBossExplosion() {
+  if (!audioCtx) return;
+
+  for (let i = 0; i < 3; i++) {
+    setTimeout(() => {
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      oscillator.type = 'sawtooth';
+      oscillator.frequency.setValueAtTime(150 - i * 30, audioCtx.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.25);
+
+      gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + 0.25);
+    }, i * 100);
+  }
+}
+
+function playHit() {
+  if (!audioCtx) return;
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  oscillator.type = 'square';
+  oscillator.frequency.setValueAtTime(80, audioCtx.currentTime);
+
+  gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+
+  oscillator.start(audioCtx.currentTime);
+  oscillator.stop(audioCtx.currentTime + 0.08);
+}
+
+function playBossWarning() {
+  if (!audioCtx) return;
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  oscillator.type = 'sine';
+  oscillator.frequency.setValueAtTime(400, audioCtx.currentTime);
+  oscillator.frequency.setValueAtTime(500, audioCtx.currentTime + 0.15);
+
+  gainNode.gain.setValueAtTime(0.12, audioCtx.currentTime);
+  gainNode.gain.setValueAtTime(0, audioCtx.currentTime + 0.3);
+
+  oscillator.start(audioCtx.currentTime);
+  oscillator.stop(audioCtx.currentTime + 0.3);
+}
+
+function playBossShoot() {
+  if (!audioCtx) return;
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  oscillator.type = 'square';
+  oscillator.frequency.setValueAtTime(250, audioCtx.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.05);
+
+  gainNode.gain.setValueAtTime(0.06, audioCtx.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+
+  oscillator.start(audioCtx.currentTime);
+  oscillator.stop(audioCtx.currentTime + 0.05);
+}
+
 document.getElementById('start-btn').addEventListener('click', startGame);
 
 function startGame() {
   if (gameStarted) return;
   gameStarted = true;
+
+  initAudio();
 
   document.getElementById('start-screen').classList.add('hidden');
   document.getElementById('game-container').classList.add('active');
@@ -882,12 +1112,13 @@ let wave = 1;
 let kills = 0;
 let shotsFired = 0;
 let shotsHit = 0;
+let bossesDefeated = 0;
 let isGameOver = false;
 let spawnTimer = 0;
 let spawnRate = 2000;
 let fireTimer = 0;
 let fireRate = 100;
-let bulletsGroup, asteroidsGroup, cometsGroup, debrisGroup;
+let bulletsGroup, asteroidsGroup, cometsGroup, debrisGroup, bossGroup, bossBulletsGroup;
 let isInvulnerable = false;
 let baseSpeed = 80;
 let speedIncrement = 0;
@@ -895,6 +1126,12 @@ let gameScene;
 let lastPlayerX = 0;
 let moveThreshold = 1;
 let playerColliders = [];
+let boss = null;
+let bossActive = false;
+let lastBossScore = 0;
+let nextBossScore = 1000; // CHANGED FROM 500 TO 1000!
+let particlesGroup;
+let bossShootTimer = 0;
 
 function preload() {
   const g = this.add.graphics();
@@ -946,11 +1183,46 @@ function preload() {
   g.generateTexture("debris", 25, 25);
   g.clear();
 
+  g.fillStyle(0xFF0033);
+  g.fillRect(60, 0, 40, 20);
+  g.fillRect(30, 20, 100, 40);
+  g.fillRect(0, 60, 160, 30);
+  g.fillRect(20, 90, 30, 30);
+  g.fillRect(110, 90, 30, 30);
+
+  g.fillStyle(0x0099FF);
+  g.fillRect(50, 35, 15, 15);
+  g.fillRect(95, 35, 15, 15);
+
+  g.fillStyle(0xFFD700);
+  g.fillRect(70, 30, 20, 25);
+
+  g.fillStyle(0xFF6600);
+  g.fillCircle(35, 105, 8);
+  g.fillCircle(125, 105, 8);
+
+  g.lineStyle(5, 0xFF6600);
+  g.strokeRect(0, 20, 160, 100);
+  g.generateTexture("boss", 160, 120);
+  g.clear();
+
   g.fillStyle(0xFF6600);
   g.fillRoundedRect(0, 0, 8, 20, 4);
   g.fillStyle(0xffffff);
   g.fillRoundedRect(2, 2, 4, 16, 2);
   g.generateTexture("bullet", 8, 20);
+  g.clear();
+
+  g.fillStyle(0xFF0033);
+  g.fillRoundedRect(0, 0, 10, 24, 5);
+  g.fillStyle(0xFF6600);
+  g.fillRoundedRect(2, 2, 6, 20, 4);
+  g.generateTexture("bossBullet", 10, 24);
+  g.clear();
+
+  g.fillStyle(0xFFFFFF);
+  g.fillCircle(4, 4, 4);
+  g.generateTexture("particle", 8, 8);
 
   g.destroy();
 }
@@ -971,6 +1243,9 @@ function create() {
   asteroidsGroup = this.physics.add.group();
   cometsGroup = this.physics.add.group();
   debrisGroup = this.physics.add.group();
+  bossGroup = this.physics.add.group();
+  bossBulletsGroup = this.physics.add.group();
+  particlesGroup = this.physics.add.group();
 
   this.input.on("pointermove", (pointer) => {
     if (!isGameOver && player && player.active) {
@@ -995,11 +1270,59 @@ function create() {
   playerColliders.push(this.physics.add.overlap(bulletsGroup, asteroidsGroup, hitEnemy, null, this));
   playerColliders.push(this.physics.add.overlap(bulletsGroup, cometsGroup, hitComet, null, this));
   playerColliders.push(this.physics.add.overlap(bulletsGroup, debrisGroup, hitDebris, null, this));
+  playerColliders.push(this.physics.add.overlap(bulletsGroup, bossGroup, hitBoss, null, this));
   playerColliders.push(this.physics.add.overlap(player, asteroidsGroup, hitPlayer, null, this));
   playerColliders.push(this.physics.add.overlap(player, cometsGroup, hitPlayer, null, this));
   playerColliders.push(this.physics.add.overlap(player, debrisGroup, hitPlayer, null, this));
+  playerColliders.push(this.physics.add.overlap(player, bossGroup, hitPlayer, null, this));
+  playerColliders.push(this.physics.add.overlap(player, bossBulletsGroup, hitPlayerByBossBullet, null, this));
 
   spawnWave.call(this);
+}
+
+function createExplosion(x, y, color = 0xFF6600, particleCount = 12) {
+  if (!gameScene) return;
+
+  for (let i = 0; i < particleCount; i++) {
+    const particle = particlesGroup.create(x, y, "particle");
+    if (!particle) continue;
+
+    particle.setTint(color);
+    particle.setAlpha(1);
+
+    const angle = (i / particleCount) * Math.PI * 2;
+    const speed = 100 + Math.random() * 150;
+
+    particle.body.setVelocity(
+      Math.cos(angle) * speed,
+      Math.sin(angle) * speed
+    );
+
+    gameScene.tweens.add({
+      targets: particle,
+      alpha: 0,
+      scale: 0,
+      duration: 500 + Math.random() * 300,
+      ease: 'Power2',
+      onComplete: () => {
+        if (particle && particle.active) particle.destroy();
+      }
+    });
+  }
+}
+
+function createBossExplosion(x, y) {
+  if (!gameScene) return;
+
+  for (let wave = 0; wave < 4; wave++) {
+    gameScene.time.delayedCall(wave * 150, () => {
+      const offsetX = (Math.random() - 0.5) * 80;
+      const offsetY = (Math.random() - 0.5) * 80;
+      createExplosion(x + offsetX, y + offsetY, Phaser.Math.RND.pick([0xFF6600, 0xFF0033, 0xFFD700, 0x0099FF]), 20);
+    });
+  }
+
+  gameScene.cameras.main.shake(500, 0.01);
 }
 
 function update(time, delta) {
@@ -1017,10 +1340,24 @@ function update(time, delta) {
     shoot.call(this);
   }
 
-  spawnTimer += delta;
-  if (spawnTimer >= spawnRate) {
-    spawnTimer = 0;
-    spawnRandomEnemy.call(this);
+  if (!bossActive && score >= nextBossScore) {
+    spawnBoss.call(this);
+  }
+
+  if (!bossActive) {
+    spawnTimer += delta;
+    if (spawnTimer >= spawnRate) {
+      spawnTimer = 0;
+      spawnRandomEnemy.call(this);
+    }
+  }
+
+  if (boss && boss.active && bossActive) {
+    bossShootTimer += delta;
+    if (bossShootTimer >= 800) {
+      bossShootTimer = 0;
+      bossShoot();
+    }
   }
 
   [asteroidsGroup, cometsGroup, debrisGroup].forEach(group => {
@@ -1053,8 +1390,28 @@ function update(time, delta) {
     });
   });
 
+  if (boss && boss.active) {
+    const bossTime = boss.getData('moveTime') + delta;
+    boss.setData('moveTime', bossTime);
+
+    const moveX = Math.sin(bossTime / 800) * 120;
+    boss.body.setVelocityX(moveX);
+
+    if (boss.y < 100) {
+      boss.body.setVelocityY(20);
+    } else {
+      boss.body.setVelocityY(0);
+    }
+  }
+
   bulletsGroup.children.entries.forEach(bullet => {
     if (bullet && bullet.active && bullet.y < -30) {
+      bullet.destroy();
+    }
+  });
+
+  bossBulletsGroup.children.entries.forEach(bullet => {
+    if (bullet && bullet.active && bullet.y > this.sys.canvas.height + 30) {
       bullet.destroy();
     }
   });
@@ -1063,7 +1420,7 @@ function update(time, delta) {
                       cometsGroup.countActive(true) + 
                       debrisGroup.countActive(true);
 
-  if (totalEnemies === 0 && spawnTimer > 800) {
+  if (!bossActive && totalEnemies === 0 && spawnTimer > 800) {
     nextWave.call(this);
   }
 
@@ -1074,8 +1431,170 @@ function update(time, delta) {
   document.getElementById("difficulty-fill").style.width = difficultyPercent + "%";
 }
 
+function bossShoot() {
+  if (!boss || !boss.active || !player || !player.active) return;
+
+  playBossShoot();
+
+  const angles = [-15, 0, 15];
+
+  angles.forEach(angleOffset => {
+    const bullet = bossBulletsGroup.create(boss.x, boss.y + 60, "bossBullet");
+    if (!bullet) return;
+
+    const angleToPlayer = Phaser.Math.Angle.Between(boss.x, boss.y, player.x, player.y);
+    const finalAngle = angleToPlayer + (angleOffset * Math.PI / 180);
+
+    const speed = 300;
+    bullet.body.setVelocity(
+      Math.cos(finalAngle) * speed,
+      Math.sin(finalAngle) * speed
+    );
+
+    bullet.setRotation(finalAngle + Math.PI / 2);
+  });
+}
+
+function spawnBoss() {
+  if (!gameScene || isGameOver || bossActive) return;
+
+  asteroidsGroup.clear(true, true);
+  cometsGroup.clear(true, true);
+  debrisGroup.clear(true, true);
+
+  bossActive = true;
+  bossShootTimer = 0;
+
+  playBossWarning();
+
+  const warning = document.getElementById('boss-warning');
+  warning.classList.add('active');
+  setTimeout(() => {
+    warning.classList.remove('active');
+  }, 2000);
+
+  gameScene.time.delayedCall(2000, () => {
+    if (isGameOver) return;
+
+    const centerX = gameScene.sys.canvas.width / 2;
+    boss = bossGroup.create(centerX, -60, "boss");
+    if (!boss) return;
+
+    boss.setScale(0.6);
+    boss.body.setSize(140, 100);
+    boss.setData('hp', 50);
+    boss.setData('maxHp', 50);
+    boss.setData('moveTime', 0);
+
+    document.getElementById('boss-health-container').classList.add('active');
+    updateBossHealth();
+
+    gameScene.tweens.add({
+      targets: boss,
+      scale: 0.8,
+      duration: 500,
+      ease: 'Back.easeOut'
+    });
+  });
+}
+
+function updateBossHealth() {
+  if (!boss || !boss.active) return;
+  const hp = boss.getData('hp');
+  const maxHp = boss.getData('maxHp');
+  const percent = (hp / maxHp) * 100;
+  document.getElementById('boss-health-fill').style.width = percent + '%';
+}
+
+function hitBoss(bullet, bossObj) {
+  if (isGameOver || !bullet || !bossObj || !bullet.active || !bossObj.active) return;
+
+  bullet.destroy();
+  shotsHit++;
+  playHit();
+
+  const hp = bossObj.getData('hp') || 1;
+
+  if (hp <= 1) {
+    const bx = bossObj.x;
+    const by = bossObj.y;
+
+    createBossExplosion(bx, by);
+    playBossExplosion();
+
+    bossBulletsGroup.clear(true, true);
+
+    bossObj.destroy();
+    boss = null;
+    bossActive = false;
+    bossesDefeated++;
+    score += 200;
+    nextBossScore = score + 1000; // CHANGED FROM 500 TO 1000!
+
+    document.getElementById('boss-health-container').classList.remove('active');
+
+  } else {
+    bossObj.setData('hp', hp - 1);
+    updateBossHealth();
+    bossObj.setTint(0xffffff);
+    gameScene.time.delayedCall(50, () => {
+      if (bossObj && bossObj.active) bossObj.clearTint();
+    });
+    score += 5;
+  }
+}
+
+function hitPlayerByBossBullet(playerObj, bullet) {
+  if (isGameOver || isInvulnerable || !bullet || !bullet.active || !playerObj || !playerObj.active) {
+    return;
+  }
+
+  bullet.destroy();
+  health--;
+  playHit();
+
+  const hearts = document.querySelectorAll(".heart");
+  const heartIndex = 2 - health;
+  if (hearts[heartIndex]) {
+    hearts[heartIndex].classList.add("lost");
+  }
+
+  isInvulnerable = true;
+  let flashCount = 0;
+  const flashInterval = setInterval(() => {
+    if (isGameOver) {
+      clearInterval(flashInterval);
+      return;
+    }
+    if (player && player.active) {
+      player.alpha = player.alpha === 1 ? 0.3 : 1;
+    }
+    flashCount++;
+    if (flashCount >= 10) {
+      clearInterval(flashInterval);
+      if (player && player.active && !isGameOver) player.alpha = 1;
+      isInvulnerable = false;
+    }
+  }, 80);
+
+  if (health <= 0) {
+    isGameOver = true;
+    clearInterval(flashInterval);
+
+    playerColliders.forEach(collider => collider.active = false);
+
+    if (player && player.active) {
+      createExplosion(player.x, player.y, 0xFF0033, 15);
+      player.setTint(0xFF6600);
+      player.alpha = 1;
+    }
+
+    gameScene.time.delayedCall(500, endGame);
+  }
+}
+
 function spawnRandomEnemy() {
-  if (isGameOver) return;
+  if (isGameOver || bossActive) return;
 
   if (wave <= 3) {
     spawnAsteroid.call(gameScene);
@@ -1183,21 +1702,22 @@ function spawnWave() {
   }
 
   for (let i = 0; i < asteroidCount; i++) {
-    gameScene.time.delayedCall(i * 400, () => { if (!isGameOver) spawnAsteroid.call(gameScene); });
+    gameScene.time.delayedCall(i * 400, () => { if (!isGameOver && !bossActive) spawnAsteroid.call(gameScene); });
   }
 
   for (let i = 0; i < cometCount; i++) {
-    gameScene.time.delayedCall((asteroidCount + i) * 400, () => { if (!isGameOver) spawnComet.call(gameScene); });
+    gameScene.time.delayedCall((asteroidCount + i) * 400, () => { if (!isGameOver && !bossActive) spawnComet.call(gameScene); });
   }
 
   for (let i = 0; i < debrisCount; i++) {
-    gameScene.time.delayedCall((asteroidCount + cometCount + i) * 400, () => { if (!isGameOver) spawnDebris.call(gameScene); });
+    gameScene.time.delayedCall((asteroidCount + cometCount + i) * 400, () => { if (!isGameOver && !bossActive) spawnDebris.call(gameScene); });
   }
 }
 
 function shoot() {
   if (isGameOver || !player || !player.active) return;
   shotsFired++;
+  playShoot();
 
   const bullet = bulletsGroup.create(player.x, player.y - 20, "bullet");
   if (!bullet) return;
@@ -1209,8 +1729,14 @@ function shoot() {
 function hitEnemy(bullet, enemy) {
   if (isGameOver || !bullet || !enemy || !bullet.active || !enemy.active) return;
 
+  const ex = enemy.x;
+  const ey = enemy.y;
+
   bullet.destroy();
   enemy.destroy();
+
+  createExplosion(ex, ey, 0xFF6600, 8);
+  playExplosion();
 
   shotsHit++;
   kills++;
@@ -1224,13 +1750,20 @@ function hitComet(bullet, comet) {
 
   const hp = comet.getData('hp') || 1;
   if (hp <= 1) {
+    const cx = comet.x;
+    const cy = comet.y;
+
     comet.destroy();
+    createExplosion(cx, cy, 0x0099FF, 10);
+    playExplosion();
+
     shotsHit++;
     kills++;
     score += 25;
   } else {
     comet.setData('hp', hp - 1);
     comet.setTint(0xff6666);
+    playHit();
     gameScene.time.delayedCall(100, () => {
       if (comet && comet.active) comet.clearTint();
     });
@@ -1242,8 +1775,14 @@ function hitComet(bullet, comet) {
 function hitDebris(bullet, debris) {
   if (isGameOver || !bullet || !debris || !bullet.active || !debris.active) return;
 
+  const dx = debris.x;
+  const dy = debris.y;
+
   bullet.destroy();
   debris.destroy();
+
+  createExplosion(dx, dy, 0x888888, 6);
+  playExplosion();
 
   shotsHit++;
   kills++;
@@ -1257,6 +1796,7 @@ function hitPlayer(playerObj, enemy) {
 
   enemy.destroy();
   health--;
+  playHit();
 
   const hearts = document.querySelectorAll(".heart");
   const heartIndex = 2 - health;
@@ -1289,6 +1829,7 @@ function hitPlayer(playerObj, enemy) {
     playerColliders.forEach(collider => collider.active = false);
 
     if (player && player.active) {
+      createExplosion(player.x, player.y, 0xFF0033, 15);
       player.setTint(0xFF6600);
       player.alpha = 1;
     }
@@ -1309,14 +1850,14 @@ function endGame() {
   asteroidsGroup.clear(true, true);
   cometsGroup.clear(true, true);
   debrisGroup.clear(true, true);
+  bossGroup.clear(true, true);
   bulletsGroup.clear(true, true);
-
-  const accuracy = shotsFired > 0 ? Math.round((shotsHit / shotsFired) * 100) : 0;
+  bossBulletsGroup.clear(true, true);
 
   document.getElementById("modal-score").textContent = score;
   document.getElementById("modal-wave").textContent = wave;
   document.getElementById("modal-kills").textContent = kills;
-  document.getElementById("modal-accuracy").textContent = accuracy + "%";
+  document.getElementById("modal-bosses").textContent = bossesDefeated;
   document.getElementById("game-over-modal").classList.add("active");
 }
 </script>
