@@ -1212,6 +1212,48 @@ function playHealthPickup() {
   oscillator.stop(audioCtx.currentTime + 0.2);
 }
 
+
+// Level complete screen
+function showLevelComplete(completedLevel) {
+  const modal = document.getElementById('game-over-modal');
+  const acc = shotsHit > 0 ? Math.floor((shotsHit / shotsFired) * 100) : 0;
+  const isLastLevel = completedLevel >= 10;
+
+  modal.querySelector('.modal-content').innerHTML = 
+    '<div style="background:linear-gradient(135deg,#00FF66,#00CC55);padding:20px 40px;border-radius:16px 16px 0 0;margin:-32px -32px 30px -32px;"><h1 style="font-size:48px;font-weight:900;color:#000;margin:0;text-transform:uppercase;">' + (isLastLevel ? '🏆 LEVEL ' + completedLevel + ' COMPLETE!' : '✅ LEVEL ' + completedLevel + ' COMPLETE!') + '</h1></div>' +
+    '<div style="font-size:64px;font-weight:900;background:linear-gradient(135deg,#FFD700,#FF6600);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:30px;">' + score + '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:30px;padding:20px;background:rgba(255,255,255,0.05);border-radius:12px;">' +
+    '<div style="text-align:center;"><div style="font-size:40px;">💀</div><div style="font-size:11px;color:#888;">KILLS</div><div style="font-size:32px;font-weight:900;color:#FF6600;">' + kills + '</div></div>' +
+    '<div style="text-align:center;"><div style="font-size:40px;">🎯</div><div style="font-size:11px;color:#888;">ACCURACY</div><div style="font-size:32px;font-weight:900;color:#0099FF;">' + acc + '%</div></div>' +
+    '<div style="text-align:center;"><div style="font-size:40px;">👾</div><div style="font-size:11px;color:#888;">BOSSES</div><div style="font-size:32px;font-weight:900;color:#FFD700;">' + bossesDefeated + '</div></div></div>' +
+    (isLastLevel ? '<div style="font-size:20px;color:#FFD700;margin-bottom:30px;font-weight:800;">🎉 ALL 10 LEVELS COMPLETE! 🎉</div>' : '<div style="font-size:20px;color:#00FF66;margin-bottom:30px;font-weight:800;">🔓 NEXT LEVEL READY!</div>') +
+    '<div style="display:flex;gap:16px;">' +
+      (isLastLevel ? 
+        '<button onclick="location.reload()" style="flex:1;padding:24px;background:linear-gradient(135deg,#FFD700,#FF6600);color:#000;border:none;border-radius:16px;font-size:20px;font-weight:900;cursor:pointer;">🏆 MAIN MENU</button>' :
+        '<button onclick="continueNextLevel()" style="flex:1;padding:24px;background:linear-gradient(135deg,#00FF66,#00CC55);color:#000;border:none;border-radius:16px;font-size:20px;font-weight:900;cursor:pointer;">▶ NEXT LEVEL</button>' +
+        '<button onclick="location.reload()" style="flex:1;padding:24px;background:linear-gradient(135deg,#FF6600,#cc5200);color:white;border:none;border-radius:16px;font-size:20px;font-weight:900;cursor:pointer;">🏠 MAIN MENU</button>'
+      ) +
+    '</div>';
+  modal.classList.add('active');
+}
+
+function continueNextLevel() {
+  currentLevel++;
+  document.getElementById('game-over-modal').classList.remove('active');
+  isGameOver = false;
+  spawnTimer = 0;
+  health = 3;
+  nextBossScore = score + 1000;
+  updateHeartsDisplay();
+  if (gameScene) {
+    asteroidsGroup.clear(true, true);
+    cometsGroup.clear(true, true);
+    debrisGroup.clear(true, true);
+    healthPowerupsGroup.clear(true, true);
+    bossBulletsGroup.clear(true, true);
+  }
+}
+
 loadHighScore();
 
 document.getElementById('start-btn').addEventListener('click', startGame);
@@ -1307,6 +1349,8 @@ let particlesGroup;
 let bossShootTimer = 0;
 let healthSpawnTimer = 0;
 let currentBossLevel = 1;
+    let currentLevel = 1;
+    let highestLevelUnlocked = 10;
 
 function preload() {
   const g = this.add.graphics();
@@ -1600,7 +1644,7 @@ function update(time, delta) {
 
   lastPlayerX = player.x;
 
-  speedIncrement = Math.floor(wave / 3) * 15;
+  speedIncrement = wave < 16 ? Math.floor(wave / 3) * 15 : Math.floor(15 + ((wave - 15) * 3));
   spawnRate = Math.max(2000 - Math.floor(wave / 2) * 150, 800);
 
   fireTimer += delta;
@@ -1662,7 +1706,7 @@ function update(time, delta) {
           obj.body.setVelocityX(direction * swerveSpeed);
         } else if (swervePattern === 'chase' && player && player.active) {
           const dirToPlayer = player.x - obj.x;
-          obj.body.setVelocityX(Math.sign(dirToPlayer) * swerveSpeed * 0.7);
+          obj.body.setVelocityX(Math.sign(dirToPlayer) * swerveSpeed * (wave < 16 ? 0.7 : 1.3));
         }
       }
     });
@@ -1783,7 +1827,7 @@ function spawnBoss() {
     boss.body.setSize(140, 100);
 
     const baseHP = 30;
-    const hpIncrease = (currentBossLevel - 1) * 15;
+    const hpIncrease = (currentBossLevel - 1) * 25;
     const bossHP = baseHP + hpIncrease;
 
     boss.setData('hp', bossHP);
@@ -1884,8 +1928,12 @@ function hitBoss(bullet, bossObj) {
     nextBossScore = score + 1000;
 
     restoreFullHealth();
-
     document.getElementById('boss-health-container').classList.remove('active');
+
+    isGameOver = true;
+    const completedLevel = currentLevel;
+    saveHighScore(score, playerUsername);
+    setTimeout(() => showLevelComplete(completedLevel), 500);
 
   } else {
     bossObj.setData('hp', hp - 1);
@@ -1981,7 +2029,7 @@ function spawnAsteroid() {
 
   const patterns = ['sine', 'zigzag', 'chase', 'straight'];
   ast.setData('swervePattern', Phaser.Math.RND.pick(patterns));
-  ast.setData('swerveSpeed', Phaser.Math.Between(80, 140));
+  ast.setData('swerveSpeed', Phaser.Math.Between(100 + (wave * 6), 200 + (wave * 10)));
   ast.setData('swerveTime', 0);
 
   gameScene.tweens.add({ targets: ast, scale: 1, duration: 300, ease: 'Back.easeOut' });
