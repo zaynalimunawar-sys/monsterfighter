@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>OPERATION: ASTEROID DEFENSE | UBISOFT ULTIMATE EDITION</title>
+  <title>OPERATION: ASTEROID DEFENSE | ZAYNISOFT ULTIMATE EDITION</title>
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,maximum-scale=1" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -231,19 +231,20 @@
       animation-delay: 2s;
     }
 
-    .ubi-logo {
+    .zayni-logo {
       position: absolute;
       top: 30px;
       left: 30px;
       font-family: 'Arial Black', sans-serif;
-      font-size: 20px;
+      font-size: 22px;
       font-weight: 900;
       color: var(--ubi-orange);
       text-transform: uppercase;
       letter-spacing: 3px;
+      text-shadow: 0 0 20px var(--orange-glow);
     }
 
-    .ubi-logo::before {
+    .zayni-logo::before {
       content: "⬢";
       margin-right: 8px;
       color: var(--ubi-blue);
@@ -723,6 +724,7 @@
       .modal-title { font-size: 52px; }
       .modal-score { font-size: 80px; }
       .modal-stat-value { font-size: 28px; }
+      .zayni-logo { font-size: 24px; }
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.85.0/dist/phaser.js"></script>
@@ -730,7 +732,7 @@
 <body>
 
 <div class="start-screen" id="start-screen">
-  <div class="ubi-logo">UBISOFT</div>
+  <div class="zayni-logo">ZAYNISOFT</div>
 
   <div class="scan-effect">
     <div class="scan-line"></div>
@@ -755,7 +757,7 @@
   </div>
 
   <div class="feature-badges">
-    <div class="badge">🎮 Ubisoft Edition</div>
+    <div class="badge">🎮 Zaynisoft Edition</div>
     <div class="badge">☄️ Progressive Waves</div>
     <div class="badge">💀 Elite Difficulty</div>
   </div>
