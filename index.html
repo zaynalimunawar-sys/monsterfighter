@@ -971,7 +971,20 @@
 .result-claim-btn:hover{transform:scale(1.05)}
 .result-claim-btn:active{transform:scale(0.95)}
 
-  </style>
+  
+
+.wheel-button{background:linear-gradient(135deg,#FF1493,#9D4EDD);color:white;border:3px solid rgba(255,20,147,0.5);padding:14px 40px;border-radius:50px;font-size:18px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:2px;margin-top:16px;transition:all 0.3s ease;}
+.wheel-button:hover{transform:scale(1.05);}
+.wheel-button:active{transform:scale(0.96);}
+.wheel-panel{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.95);z-index:600;align-items:center;justify-content:center;padding:20px;overflow-y:auto;}
+.wheel-panel.active{display:flex;}
+.wheel-content{background:linear-gradient(145deg,rgba(10,14,39,0.98),rgba(26,31,58,0.98));border:3px solid #FF1493;border-radius:24px;padding:40px;max-width:600px;width:100%;box-shadow:0 0 80px rgba(255,20,147,0.6);}
+.wheel-result-popup{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:700;background:linear-gradient(145deg,rgba(10,14,39,0.98),rgba(26,31,58,0.98));border:4px solid #FFD700;border-radius:24px;padding:50px;box-shadow:0 0 100px rgba(255,215,0,0.8);}
+.wheel-result-popup.active{display:block;}
+.start-screen{overflow-y:auto!important;padding-bottom:max(var(--safe-area-bottom),60px)!important;}
+.button-container{padding-bottom:30px;}
+
+</style>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.85.0/dist/phaser.js"></script>
 </head>
 <body>
@@ -1011,6 +1024,8 @@
   <button class="shop-button" onclick="openShop()">💰 SHIP SHOP</button>
   
   <button class="box-button" onclick="openBoxShop()">🎁 LOOT BOXES</button>
+
+  <button class="wheel-button" id="wheel-btn">🎡 LUCKY WHEEL</button>
 
   <div class="feature-badges">
     <div class="badge">🎮  Edition</div>
@@ -2729,6 +2744,299 @@ function updateMoneyDisplay() {
   const moneyEl = document.getElementById("money-amount");
   if (moneyEl) moneyEl.textContent = playerMoney;
 }
+
+
+// LUCKY WHEEL - FIXED TO READ GLOBAL playerMoney
+(function() {
+  let isSpinning = false;
+  let currentRotation = 0;
+  let canvas, ctx;
+  let selectedPrize = null;
+
+  const prizes = [
+    {type:'coins',amount:100,icon:'💰',color:'#FFD700',weight:30},
+    {type:'coins',amount:500,icon:'💰',color:'#FF6600',weight:20},
+    {type:'coins',amount:1000,icon:'💎',color:'#9D4EDD',weight:15},
+    {type:'coins',amount:2000,icon:'💵',color:'#00FF66',weight:10},
+    {type:'gems',amount:5,icon:'💎',color:'#FF006E',weight:8},
+    {type:'gems',amount:10,icon:'💎💎',color:'#FF1493',weight:5},
+    {type:'ship',ship:'rapid',icon:'⚡',color:'#0099FF',weight:4},
+    {type:'ship',ship:'shield',icon:'🛡️',color:'#00FF66',weight:3.5},
+    {type:'ship',ship:'missile',icon:'🚀',color:'#FF6600',weight:3},
+    {type:'lives',amount:1,icon:'❤️',color:'#FF0033',weight:2.5},
+    {type:'jackpot',amount:10000,icon:'🎰',color:'#FFD700',weight:2},
+    {type:'ultraship',ship:'ultra',icon:'👑',color:'#FF00FF',weight:0.99}
+  ];
+
+  function init() {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', attachListeners);
+    } else {
+      attachListeners();
+    }
+  }
+
+  function attachListeners() {
+    const wheelBtn = document.getElementById('wheel-btn');
+    const closeBtn = document.getElementById('close-wheel-btn');
+    const spinBtn = document.getElementById('spin-wheel-btn');
+    const claimBtn = document.getElementById('claim-prize-btn');
+
+    if (wheelBtn) wheelBtn.addEventListener('click', openWheel);
+    if (closeBtn) closeBtn.addEventListener('click', closeWheel);
+    if (spinBtn) spinBtn.addEventListener('click', spin);
+    if (claimBtn) claimBtn.addEventListener('click', claim);
+  }
+
+  function getMoney() {
+    // Try multiple possible variable names
+    if (typeof window.playerMoney !== 'undefined') return window.playerMoney;
+    if (typeof playerMoney !== 'undefined') return playerMoney;
+    return 0;
+  }
+
+  function openWheel() {
+    const money = getMoney();
+    console.log('Opening wheel. Money found:', money);
+    console.log('Global variables:', {playerMoney: window.playerMoney, score: window.score});
+
+    const panel = document.getElementById('wheel-panel');
+    if (panel) {
+      panel.classList.add('active');
+      updateDisplay();
+
+      if (!canvas) {
+        canvas = document.getElementById('wheel-canvas');
+        if (canvas) {
+          ctx = canvas.getContext('2d');
+          drawWheel();
+        }
+      }
+    }
+  }
+
+  function closeWheel() {
+    const panel = document.getElementById('wheel-panel');
+    if (panel) panel.classList.remove('active');
+  }
+
+  function updateDisplay() {
+    const money = getMoney();
+
+    const moneyEl = document.getElementById('wheel-money-display');
+    if (moneyEl) moneyEl.textContent = money;
+
+    const spinBtn = document.getElementById('spin-wheel-btn');
+    if (spinBtn) {
+      spinBtn.disabled = money < 999 || isSpinning;
+      if (money < 999) {
+        spinBtn.textContent = '❌ NOT ENOUGH CREDITS (NEED 999)';
+      } else {
+        spinBtn.textContent = '💰 SPIN (999 CREDITS)';
+      }
+    }
+
+    console.log('Display updated. Money shown:', money);
+  }
+
+  function drawWheel() {
+    if (!ctx) return;
+
+    const cx = 200, cy = 200, r = 180;
+    ctx.clearRect(0, 0, 400, 400);
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(currentRotation * Math.PI / 180);
+    ctx.translate(-cx, -cy);
+
+    const segAngle = 360 / prizes.length;
+
+    prizes.forEach((p, i) => {
+      const start = (i * segAngle - 90) * Math.PI / 180;
+      const end = ((i + 1) * segAngle - 90) * Math.PI / 180;
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, start, end);
+      ctx.closePath();
+      ctx.fillStyle = p.color;
+      ctx.fill();
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      const textAngle = start + segAngle / 2 * Math.PI / 180;
+      const tx = cx + Math.cos(textAngle) * 120;
+      const ty = cy + Math.sin(textAngle) * 120;
+
+      ctx.save();
+      ctx.translate(tx, ty);
+      ctx.rotate(textAngle + Math.PI / 2);
+      ctx.font = 'bold 28px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#FFF';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 3;
+      ctx.strokeText(p.icon, 0, 0);
+      ctx.fillText(p.icon, 0, 0);
+      ctx.restore();
+    });
+
+    ctx.restore();
+  }
+
+  function spin() {
+    const money = getMoney();
+    console.log('Spin clicked. Money:', money);
+
+    if (isSpinning || money < 999) {
+      console.log('Cannot spin:', {isSpinning, money});
+      if (money < 999) {
+        if (typeof showError === 'function') showError('NOT ENOUGH CREDITS! NEED 999!');
+      }
+      return;
+    }
+
+    // Deduct from the global variable
+    if (typeof window.playerMoney !== 'undefined') {
+      window.playerMoney -= 999;
+    } else if (typeof playerMoney !== 'undefined') {
+      playerMoney -= 999;
+    }
+
+    if (typeof updateMoneyDisplay === 'function') updateMoneyDisplay();
+    if (typeof savePlayerData === 'function') savePlayerData();
+
+    isSpinning = true;
+    updateDisplay();
+
+    const total = prizes.reduce((s, p) => s + p.weight, 0);
+    let rand = Math.random() * total;
+    let idx = 0;
+
+    for (let i = 0; i < prizes.length; i++) {
+      rand -= prizes[i].weight;
+      if (rand <= 0) {
+        idx = i;
+        break;
+      }
+    }
+
+    selectedPrize = prizes[idx];
+    console.log('Selected:', selectedPrize);
+
+    const segAngle = 360 / prizes.length;
+    const target = idx * segAngle;
+    const spins = 5 * 360;
+    const final = spins + (360 - target) + segAngle / 2;
+    const start = currentRotation % 360;
+    const startTime = Date.now();
+
+    function animate() {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / 4000, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+
+      currentRotation = start + final * ease;
+      drawWheel();
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        isSpinning = false;
+        showResult();
+      }
+    }
+
+    animate();
+  }
+
+  function showResult() {
+    const popup = document.getElementById('wheel-result-popup');
+    const icon = document.getElementById('result-prize-icon');
+    const desc = document.getElementById('result-prize-desc');
+
+    if (icon) icon.textContent = selectedPrize.icon;
+
+    let text = '';
+    if (selectedPrize.type === 'coins' || selectedPrize.type === 'jackpot') {
+      text = selectedPrize.amount + ' CREDITS!';
+    } else if (selectedPrize.type === 'gems') {
+      text = selectedPrize.amount + ' GEMS!';
+    } else if (selectedPrize.type === 'ship') {
+      text = 'NEW SHIP!';
+    } else if (selectedPrize.type === 'ultraship') {
+      text = '👑 ULTRA SHIP! 👑';
+    } else if (selectedPrize.type === 'lives') {
+      text = '+1 LIFE!';
+    }
+
+    if (desc) desc.textContent = text;
+    if (popup) popup.classList.add('active');
+  }
+
+  function claim() {
+    const popup = document.getElementById('wheel-result-popup');
+    if (popup) popup.classList.remove('active');
+
+    const p = selectedPrize;
+
+    if (p.type === 'coins' || p.type === 'jackpot') {
+      if (typeof addMoney === 'function') addMoney(p.amount);
+      if (typeof showError === 'function') showError('💰 +' + p.amount + ' CREDITS!');
+    } else if (p.type === 'gems') {
+      if (typeof window.playerGems !== 'undefined') {
+        window.playerGems += p.amount;
+        if (typeof updateGemDisplay === 'function') updateGemDisplay();
+        if (typeof savePlayerData === 'function') savePlayerData();
+      }
+      if (typeof showError === 'function') showError('💎 +' + p.amount + ' GEMS!');
+    } else if (p.type === 'ship') {
+      if (typeof ownedShips !== 'undefined' && !ownedShips.includes(p.ship)) {
+        ownedShips.push(p.ship);
+        if (typeof savePlayerData === 'function') savePlayerData();
+        if (typeof showError === 'function') showError('🚀 NEW SHIP!');
+      } else {
+        if (typeof addMoney === 'function') addMoney(2000);
+        if (typeof showError === 'function') showError('💰 DUPLICATE! +2000 CREDITS!');
+      }
+    } else if (p.type === 'ultraship') {
+      if (typeof ownedShips !== 'undefined' && !ownedShips.includes('ultra')) {
+        ownedShips.push('ultra');
+        if (typeof savePlayerData === 'function') savePlayerData();
+        if (typeof showError === 'function') showError('👑 ULTRA SHIP UNLOCKED! 👑');
+      } else {
+        if (typeof addMoney === 'function') addMoney(50000);
+        if (typeof showError === 'function') showError('💰 DUPLICATE ULTRA! +50000!');
+      }
+    } else if (p.type === 'lives') {
+      if (typeof gameStarted !== 'undefined' && gameStarted && typeof health !== 'undefined' && health < 3) {
+        health++;
+        if (typeof updateHeartsDisplay === 'function') updateHeartsDisplay();
+        if (typeof showError === 'function') showError('❤️ +1 LIFE!');
+      } else {
+        if (typeof addMoney === 'function') addMoney(500);
+        if (typeof showError === 'function') showError('💰 +500 CREDITS!');
+      }
+    }
+
+    updateDisplay();
+  }
+
+  // Periodically refresh display when panel is open
+  setInterval(() => {
+    const panel = document.getElementById('wheel-panel');
+    if (panel && panel.classList.contains('active')) {
+      updateDisplay();
+    }
+  }, 500);
+
+  init();
+  console.log('Wheel system loaded with auto-refresh');
+})();
+
+
 </script>
 
 
@@ -2819,6 +3127,37 @@ function updateMoneyDisplay() {
 
 <div class="levelup-toast" id="levelup-toast">
   <h2 class="levelup-text">⬆️ LEVEL UP!<br>SHIP PASS LEVEL <span id="levelup-num">2</span>!</h2>
+</div>
+
+
+
+<div class="wheel-panel" id="wheel-panel">
+  <div class="wheel-content">
+    <h2 style="text-align:center;font-size:36px;color:#FF1493;margin-bottom:20px;">🎡 LUCKY WHEEL 🎡</h2>
+    <p style="text-align:center;font-size:20px;color:#9D4EDD;margin-bottom:10px;">💰 999 CREDITS PER SPIN 💰</p>
+    <p style="text-align:center;font-size:18px;color:#FFD700;margin-bottom:30px;">YOU HAVE: <span id="wheel-money-display">0</span> 💰</p>
+
+    <div style="position:relative;width:400px;height:400px;margin:0 auto 30px;max-width:90%;">
+      <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);font-size:40px;color:#FFD700;z-index:10;">▼</div>
+      <canvas id="wheel-canvas" width="400" height="400" style="width:100%;height:100%;border-radius:50%;border:5px solid #FF1493;"></canvas>
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80px;height:80px;background:linear-gradient(135deg,#FFD700,#FF6600);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#000;border:4px solid #000;z-index:5;">SPIN</div>
+    </div>
+
+    <div style="text-align:center;margin-bottom:20px;">
+      <button id="spin-wheel-btn" style="background:linear-gradient(135deg,#9D4EDD,#FF1493);color:white;border:none;padding:18px 50px;border-radius:50px;font-size:20px;font-weight:900;cursor:pointer;text-transform:uppercase;">💰 SPIN (999 CREDITS)</button>
+    </div>
+
+    <button id="close-wheel-btn" style="width:100%;background:linear-gradient(135deg,#666,#444);color:white;border:none;padding:16px;border-radius:12px;font-size:16px;font-weight:800;cursor:pointer;text-transform:uppercase;">CLOSE</button>
+  </div>
+</div>
+
+<div class="wheel-result-popup" id="wheel-result-popup">
+  <div style="text-align:center;">
+    <h2 style="font-size:32px;color:#FFD700;margin-bottom:20px;">🎉 YOU WON! 🎉</h2>
+    <div id="result-prize-icon" style="font-size:100px;margin:20px 0;">💰</div>
+    <p id="result-prize-desc" style="font-size:28px;color:#FF1493;margin-bottom:30px;font-weight:800;">100 COINS!</p>
+    <button id="claim-prize-btn" style="background:linear-gradient(135deg,#FFD700,#FF6600);color:#000;border:none;padding:18px 50px;border-radius:50px;font-size:20px;font-weight:900;cursor:pointer;text-transform:uppercase;">CLAIM</button>
+  </div>
 </div>
 
 </body>
